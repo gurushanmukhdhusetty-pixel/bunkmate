@@ -19,27 +19,6 @@
             width: 100%;
         }
 
-        /* Fixed Levitation Animation - Large container avoids all clipping */
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-15px); }
-            100% { transform: translateY(0px); }
-        }
-
-        .levitate-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 30px 0; /* Huge vertical buffer to prevent clipping */
-            overflow: visible !important;
-        }
-
-        .levitate-icon {
-            animation: float 3s ease-in-out infinite;
-            filter: drop-shadow(0 15px 15px rgba(79, 70, 229, 0.25));
-            overflow: visible !important;
-        }
-
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
         input[type='range'] {
@@ -68,6 +47,15 @@
             backdrop-filter: blur(8px);
         }
 
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .float-logo {
+            animation: float 4s ease-in-out infinite;
+        }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
@@ -76,10 +64,12 @@
 
     <script type="text/babel">
         const Icons = {
+            // BRAND NEW LOGO: Geometric Stacked Bunks
             Logo: ({ size = 24, className = "" }) => (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" fill="currentColor" fillOpacity="0.2"/>
-                    <polyline points="9 12 11 14 15 10" />
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+                    <rect x="3" y="14" width="18" height="6" rx="2" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="2"/>
+                    <rect x="3" y="4" width="18" height="6" rx="2" fill="currentColor" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M7 20V22M17 20V22M7 10V14M17 10V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
             ),
             Dashboard: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
@@ -87,12 +77,12 @@
             Calendar: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
             Check: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
             X: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-            Reschedule: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 0-9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/><path d="M12 7v5l2 2"/></svg>,
-            Cancel: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>,
+            Canceled: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>,
             Trash: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
             Flame: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.291 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>,
+            Plus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
             ChevronLeft: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
-            Plus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Reschedule: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 0-9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/><path d="M12 7v5l2 2"/></svg>
         };
 
         const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -100,7 +90,7 @@
         const calculateStats = (logs, target, totalCap) => {
             const conducted = logs.filter(l => l.status === 'present' || l.status === 'absent').length;
             const present = logs.filter(l => l.status === 'present').length;
-            const slotsUsed = logs.length; // Includes canceled/rescheduled sessions
+            const slotsUsed = logs.length; 
             
             const percentage = conducted === 0 ? 100 : (present / conducted) * 100;
             const remainingSlots = Math.max(0, totalCap - slotsUsed);
@@ -125,28 +115,39 @@
                 else if (log.status === 'absent') break;
             }
 
-            return { percentage, safeToBunk, needToAttend, conducted, remainingSlots, maxPossible, streak, isImpossible: maxPossible < target };
+            return { 
+                percentage, 
+                safeToBunk, 
+                needToAttend, 
+                conducted, 
+                remainingSlots, 
+                maxPossible, 
+                streak, 
+                isImpossible: maxPossible < target 
+            };
         };
 
         const { useState, useEffect, useMemo } = React;
 
         function App() {
-            const [user, setUser] = useState(() => localStorage.getItem('bm_p_user'));
+            const [user, setUser] = useState(() => localStorage.getItem('bm_user_p'));
             const [authMode, setAuthMode] = useState(user ? 'none' : 'login');
             const [activeTab, setActiveTab] = useState('dashboard');
-            const [subjects, setSubjects] = useState(() => JSON.parse(localStorage.getItem('bm_p_subs')) || []);
-            const [timetable, setTimetable] = useState(() => JSON.parse(localStorage.getItem('bm_p_tt')) || { 
+            const [subjects, setSubjects] = useState(() => JSON.parse(localStorage.getItem('bm_subs_p')) || []);
+            const [timetable, setTimetable] = useState(() => JSON.parse(localStorage.getItem('bm_tt_p')) || { 
                 Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] 
             });
             
             const [selectedSubId, setSelectedSubId] = useState(null);
             const [modal, setModal] = useState({ isOpen: false, type: null, data: null });
+            
+            // Simulator State
             const [simAttend, setSimAttend] = useState(0);
             const [simBunk, setSimBunk] = useState(0);
 
             useEffect(() => {
-                localStorage.setItem('bm_p_subs', JSON.stringify(subjects));
-                localStorage.setItem('bm_p_tt', JSON.stringify(timetable));
+                localStorage.setItem('bm_subs_p', JSON.stringify(subjects));
+                localStorage.setItem('bm_tt_p', JSON.stringify(timetable));
             }, [subjects, timetable]);
 
             const logAttendance = (id, status, isExtra = false, countsInCap = true) => {
@@ -159,16 +160,18 @@
                 const scheduledToday = (timetable[dayName] || []).filter(sid => sid === id).length;
 
                 if (!isExtra && todaysLogs >= scheduledToday && scheduledToday > 0) {
-                    setModal({ isOpen: true, type: 'EXTRA_CHECK', data: { id, status, name: sub.name } });
+                    setModal({ isOpen: true, type: 'EXTRA_DECISION', data: { id, status, name: sub.name } });
                     return;
                 }
 
+                const newLog = { id: Date.now(), status, date: new Date().toISOString(), isExtra };
+                
                 setSubjects(prev => prev.map(s => {
                     if (s.id === id) {
                         return { 
                             ...s, 
                             totalExpected: (!countsInCap && isExtra) ? s.totalExpected + 1 : s.totalExpected,
-                            logs: [{ id: Date.now() + Math.random(), status, date: new Date().toISOString() }, ...s.logs] 
+                            logs: [newLog, ...s.logs] 
                         };
                     }
                     return s;
@@ -176,56 +179,58 @@
                 setModal({ isOpen: false });
             };
 
-            const dayAnalysis = useMemo(() => {
+            const dailyAnalysis = useMemo(() => {
                 const todayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
                 const todaysSlots = timetable[todayName] || [];
-                if (todaysSlots.length === 0) return { status: 'Relax', color: 'bg-slate-800' };
+                if (todaysSlots.length === 0) return { status: "Relax Mode", color: "bg-slate-800", desc: "No classes scheduled today." };
 
-                let canBunkAll = true;
                 const subCounts = todaysSlots.reduce((acc, id) => { acc[id] = (acc[id] || 0) + 1; return acc; }, {});
+                let canBunkAll = true;
 
                 Object.entries(subCounts).forEach(([sid, count]) => {
                     const sub = subjects.find(s => s.id === sid);
                     if (!sub) return;
-                    const simLogs = [...sub.logs];
-                    for(let i=0; i<count; i++) simLogs.push({ status: 'absent', date: new Date().toISOString() });
-                    const stats = calculateStats(simLogs, sub.target, sub.totalExpected);
+                    const simulatedLogs = [...sub.logs];
+                    for(let i=0; i<count; i++) simulatedLogs.push({ status: 'absent' });
+                    const stats = calculateStats(simulatedLogs, sub.target, sub.totalExpected);
                     if (stats.percentage < sub.target) canBunkAll = false;
                 });
 
-                return { 
-                    status: canBunkAll ? "Safe Day" : "Critical Day", 
+                return {
+                    status: canBunkAll ? "Safe Day" : "Critical Day",
                     color: canBunkAll ? "bg-indigo-600" : "bg-rose-600",
-                    desc: canBunkAll ? "Bunking everything today won't drop you below goal." : "You must attend some classes today to stay safe."
+                    desc: canBunkAll ? "You can bunk everything today and stay safe." : "You must attend some classes today to stay above goal."
                 };
             }, [subjects, timetable]);
 
             if (authMode !== 'none') {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-                        <div className="w-full max-w-sm bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100">
-                            <div className="bg-slate-900 p-10 text-center text-white">
-                                <div className="levitate-wrapper">
-                                    <div className="levitate-icon w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white">
-                                        <Icons.Logo size={40} />
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100">
+                        <div className="w-full max-w-sm bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200">
+                            <div className="bg-slate-900 p-12 text-center text-white relative">
+                                <div className="flex justify-center mb-6">
+                                    <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl float-logo">
+                                        <Icons.Logo size={48} />
                                     </div>
                                 </div>
-                                <h1 className="text-3xl font-black mt-4">BunkMate Pro</h1>
-                                <p className="text-indigo-400 text-[10px] uppercase font-bold tracking-widest mt-1">Track Your Bunks</p>
+                                <h1 className="text-3xl font-black mt-2">BunkMate Pro</h1>
+                                <p className="text-indigo-400 text-[10px] uppercase font-black tracking-widest mt-1">Track Your Bunks</p>
                             </div>
                             <form onSubmit={(e) => {
                                 e.preventDefault();
                                 const n = e.target.u.value;
                                 setUser(n);
-                                localStorage.setItem('bm_p_user', n);
+                                localStorage.setItem('bm_user_p', n);
                                 setAuthMode('none');
-                            }} className="p-8 space-y-4">
-                                <input name="u" required className="w-full h-14 bg-slate-100 rounded-2xl px-6 font-bold outline-none" placeholder="Username" />
-                                <input type="password" required className="w-full h-14 bg-slate-100 rounded-2xl px-6 font-bold outline-none" placeholder="Password" />
-                                <button className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl hover:bg-indigo-600 transition-all">Sign In</button>
-                                <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest pt-2">
-                                    {authMode === 'login' ? "New? Register Account" : "Already a user? Log In"}
-                                </button>
+                            }} className="p-10 space-y-4">
+                                <input name="u" required className="w-full h-14 bg-slate-100 rounded-2xl px-6 font-bold outline-none border-2 border-transparent focus:border-indigo-500 transition-all" placeholder="Username" />
+                                <input type="password" required className="w-full h-14 bg-slate-100 rounded-2xl px-6 font-bold outline-none border-2 border-transparent focus:border-indigo-500 transition-all" placeholder="Password" />
+                                <button className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl hover:bg-indigo-600 active:scale-95 transition-all">Start Tracking</button>
+                                <div className="text-center">
+                                    <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        {authMode === 'login' ? "New? Create Account" : "Already have an account? Sign In"}
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -233,37 +238,39 @@
             }
 
             return (
-                <div className="max-w-7xl mx-auto px-6 pt-10 pb-40">
-                    <header className="flex justify-between items-center mb-10">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg overflow-visible">
-                                <Icons.Logo size={24} className="levitate-icon" />
+                <div className="max-w-7xl mx-auto px-6 pt-10 pb-40 min-w-0">
+                    <header className="flex justify-between items-center mb-10 min-w-0">
+                        <div className="flex items-center gap-4 min-w-0">
+                            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg flex-shrink-0">
+                                <Icons.Logo size={24} />
                             </div>
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-900">BunkMate Pro</h2>
-                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Track Your Bunks • {user}</p>
+                            <div className="min-w-0">
+                                <h2 className="text-2xl font-black text-slate-900 tracking-tight truncate">BunkMate Pro</h2>
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest truncate">Track Your Bunks • {user}</p>
                             </div>
                         </div>
-                        <button onClick={() => setModal({ isOpen: true, type: 'SETTINGS' })} className="w-10 h-10 bg-white rounded-xl border border-slate-100 shadow-sm flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all">
+                        <button onClick={() => setModal({ isOpen: true, type: 'PREFS' })} className="w-10 h-10 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 flex-shrink-0 hover:text-indigo-600 transition-all">
                             <Icons.Dashboard />
                         </button>
                     </header>
 
                     {activeTab === 'dashboard' && (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
-                            {/* Dashboard Sidebar */}
+                            {/* Today's Sidebar */}
                             <div className="lg:col-span-4 space-y-6">
-                                <div className={`p-8 rounded-[3rem] text-white shadow-xl relative overflow-hidden transition-all duration-500 ${dayAnalysis.color}`}>
-                                    <div className="relative z-10 space-y-2">
-                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Daily Scenario</p>
-                                        <h4 className="text-2xl font-black tracking-tight">{dayAnalysis.status}</h4>
-                                        <p className="text-xs font-medium opacity-80 leading-relaxed">{dayAnalysis.desc}</p>
+                                <div className={`p-8 rounded-[3rem] text-white shadow-xl relative overflow-hidden transition-all duration-500 ${dailyAnalysis.color}`}>
+                                    <div className="relative z-10">
+                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Daily Status</p>
+                                        <h4 className="text-2xl font-black mb-2">{dailyAnalysis.status}</h4>
+                                        <p className="text-xs font-medium opacity-80 leading-relaxed">{dailyAnalysis.desc}</p>
                                     </div>
-                                    <Icons.Logo size={100} className="absolute -right-8 -bottom-8 opacity-10 rotate-12" />
+                                    <Icons.Logo size={120} className="absolute -right-8 -bottom-8 opacity-10 rotate-12" />
                                 </div>
 
                                 <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-slate-100">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex justify-between">Today's Routine <Icons.Calendar/></p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex justify-between items-center">
+                                        Today's Routine <Icons.Calendar />
+                                    </p>
                                     <div className="space-y-4">
                                         {(() => {
                                             const todayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
@@ -273,15 +280,16 @@
                                                 const sub = subjects.find(s => s.id === sid);
                                                 if (!sub) return null;
                                                 return (
-                                                    <div key={idx} className="p-5 bg-slate-50 rounded-[2rem] border border-slate-100 hover:shadow-md transition-all">
-                                                        <div className="flex justify-between items-center mb-3">
-                                                            <p className="font-bold text-slate-800 text-sm">{sub.name}</p>
-                                                            <span className="text-[9px] font-black text-slate-300 uppercase">Slot {idx+1}</span>
+                                                    <div key={`${sid}-${idx}`} className="p-5 bg-slate-50 rounded-[2rem] border border-slate-100 hover:shadow-md transition-all min-w-0">
+                                                        <div className="flex justify-between items-center mb-4 min-w-0">
+                                                            <p className="font-bold text-slate-800 text-sm truncate pr-2 flex-1">{sub.name}</p>
+                                                            <span className="text-[9px] font-black text-slate-300 uppercase shrink-0">Slot {idx+1}</span>
                                                         </div>
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => logAttendance(sub.id, 'present')} className="flex-1 h-11 bg-emerald-500 rounded-xl text-white flex items-center justify-center hover:bg-emerald-600 shadow-sm active:scale-95 transition-all"><Icons.Check/></button>
-                                                            <button onClick={() => logAttendance(sub.id, 'absent')} className="flex-1 h-11 bg-rose-500 rounded-xl text-white flex items-center justify-center hover:bg-rose-600 shadow-sm active:scale-95 transition-all"><Icons.X/></button>
-                                                            <button onClick={() => logAttendance(sub.id, 'canceled')} className="flex-1 h-11 bg-slate-200 rounded-xl text-slate-600 flex items-center justify-center hover:bg-slate-300 shadow-sm active:scale-95 transition-all"><Icons.Cancel/></button>
+                                                        <div className="grid grid-cols-4 gap-2">
+                                                            <button onClick={() => logAttendance(sub.id, 'present')} className="h-11 bg-emerald-500 rounded-xl text-white flex items-center justify-center hover:bg-emerald-600 shadow-sm active:scale-90 transition-all"><Icons.Check/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'absent')} className="h-11 bg-rose-500 rounded-xl text-white flex items-center justify-center hover:bg-rose-600 shadow-sm active:scale-90 transition-all"><Icons.X/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'canceled')} title="Canceled" className="h-11 bg-slate-200 rounded-xl text-slate-500 flex items-center justify-center hover:bg-slate-300 shadow-sm active:scale-90 transition-all"><Icons.Canceled/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'rescheduled')} title="Rescheduled" className="h-11 bg-indigo-500 rounded-xl text-white flex items-center justify-center hover:bg-indigo-600 shadow-sm active:scale-90 transition-all"><Icons.Reschedule/></button>
                                                         </div>
                                                     </div>
                                                 );
@@ -293,37 +301,44 @@
 
                             {/* Main Subject Grid */}
                             <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6 h-fit">
-                                {subjects.map(sub => {
+                                {subjects.length === 0 ? (
+                                    <div className="col-span-full bg-white rounded-[3rem] p-20 text-center border border-dashed border-slate-200">
+                                        <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-200 mb-4"><Icons.Courses /></div>
+                                        <p className="text-slate-400 font-bold">No subjects tracked yet.<br/><span className="text-xs">Add them in the Courses tab.</span></p>
+                                    </div>
+                                ) : subjects.map(sub => {
                                     const stats = calculateStats(sub.logs, sub.target, sub.totalExpected);
                                     const isDanger = stats.percentage < sub.target;
                                     return (
-                                        <div key={sub.id} className="bg-white rounded-[3rem] p-8 shadow-sm border border-slate-100 hover:shadow-2xl hover:-translate-y-1 transition-all group">
-                                            <div className="flex justify-between items-start mb-6">
-                                                <div className="max-w-[70%]">
-                                                    <h4 className="text-2xl font-black text-slate-800 tracking-tight truncate">{sub.name}</h4>
+                                        <div key={sub.id} className="bg-white rounded-[3rem] p-8 shadow-sm border border-slate-100 hover:shadow-2xl transition-all group relative overflow-hidden min-w-0">
+                                            <div className="flex justify-between items-start mb-6 relative z-10 min-w-0">
+                                                <div className="min-w-0 flex-1">
+                                                    <h4 className="text-2xl font-black text-slate-800 tracking-tight truncate pr-2">{sub.name}</h4>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-[10px] font-black text-slate-400 uppercase">Goal: {sub.target}%</span>
-                                                        {stats.streak >= 3 && <span className="flex items-center gap-1 bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase"><Icons.Flame/> {stats.streak} Streak</span>}
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Goal: {sub.target}%</span>
+                                                        {stats.streak >= 3 && <span className="flex items-center gap-1 bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase shrink-0"><Icons.Flame/> {stats.streak}</span>}
                                                     </div>
                                                 </div>
-                                                <div className={`text-3xl font-black tabular-nums ${isDanger ? 'text-rose-500' : 'text-emerald-500'}`}>{stats.percentage.toFixed(0)}%</div>
+                                                <div className={`text-3xl font-black tabular-nums shrink-0 ${isDanger ? 'text-rose-500' : 'text-emerald-500'}`}>{stats.percentage.toFixed(0)}%</div>
                                             </div>
-                                            <div className="h-3 w-full bg-slate-50 rounded-full mb-8 overflow-hidden">
+                                            <div className="h-3 w-full bg-slate-100 rounded-full mb-8 overflow-hidden relative z-10">
                                                 <div className={`h-full transition-all duration-1000 ${isDanger ? 'bg-rose-500' : 'bg-indigo-600'}`} style={{ width: `${Math.min(100, stats.percentage)}%` }} />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                            <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
                                                 <div className={`p-4 rounded-2xl border text-center ${isDanger ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">{!isDanger ? 'Safe to Bunk' : 'Must Attend'}</p>
-                                                    <p className={`text-base font-black ${isDanger ? 'text-rose-600' : 'text-emerald-600'}`}>{stats.isImpossible ? 'Impossible' : stats.safeToBunk > 0 ? `${stats.safeToBunk} more` : `${stats.needToAttend} classes`}</p>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1 truncate">{!isDanger ? 'Safe to Bunk' : 'Must Attend'}</p>
+                                                    <p className={`text-base font-black ${isDanger ? 'text-rose-600' : 'text-emerald-600'} truncate`}>
+                                                        {stats.isImpossible ? 'Impossible' : stats.safeToBunk > 0 ? `${stats.safeToBunk} more` : `${stats.needToAttend} next`}
+                                                    </p>
                                                 </div>
-                                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Cap Left</p>
-                                                    <p className="text-base font-black text-slate-800">{stats.remainingSlots} Slots</p>
+                                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center min-w-0">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1 truncate">Cap Left</p>
+                                                    <p className="text-base font-black text-slate-800 truncate">{stats.remainingSlots} Slots</p>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 pt-2">
-                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('forecast'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all">Simulator</button>
-                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('history'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all">History</button>
+                                            <div className="flex gap-2 relative z-10">
+                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('forecast'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">What If?</button>
+                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('history'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">Logs</button>
                                             </div>
                                         </div>
                                     );
@@ -332,43 +347,71 @@
                         </div>
                     )}
 
-                    {/* Navigation */}
+                    {/* Navigation Dock */}
                     <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-[440px] bg-slate-900/95 backdrop-blur-3xl h-20 rounded-[3rem] shadow-2xl flex items-center justify-around px-4 border border-white/10 z-[60]">
                         <button onClick={() => setActiveTab('dashboard')} className={`p-4 rounded-2xl transition-all ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}><Icons.Dashboard /></button>
                         <button onClick={() => setActiveTab('subjects')} className={`p-4 rounded-2xl transition-all ${activeTab === 'subjects' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}><Icons.Courses /></button>
                         <button onClick={() => setActiveTab('timetable')} className={`p-4 rounded-2xl transition-all ${activeTab === 'timetable' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}><Icons.Calendar /></button>
-                        <div className="w-[1.5px] h-8 bg-white/10 mx-2" />
-                        <div className="p-2 overflow-visible">
-                            <Icons.Logo size={32} className="levitate-icon text-indigo-400" />
+                        <div className="w-[1px] h-8 bg-white/10 mx-2" />
+                        <div className="p-2 flex-shrink-0">
+                            <Icons.Logo size={32} className="text-indigo-400" />
                         </div>
                     </nav>
 
-                    {/* Modal System */}
+                    {}
                     {modal.isOpen && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 modal-overlay overflow-y-auto">
                             <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 my-auto">
-                                {modal.type === 'SETTINGS' && (
+                                {modal.type === 'ADD_SUB' && (
+                                    <div className="p-10 space-y-6">
+                                        <h4 className="text-2xl font-black text-center">New Subject</h4>
+                                        <form className="space-y-4" onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const f = new FormData(e.target);
+                                            const n = f.get('n');
+                                            const t = parseInt(f.get('t'));
+                                            const c = parseInt(f.get('c'));
+                                            setSubjects([...subjects, { id: Date.now(), name: n, target: t, totalExpected: c, logs: [] }]);
+                                            setModal({ isOpen: false });
+                                        }}>
+                                            <input name="n" required placeholder="Subject Name" className="w-full h-14 bg-slate-50 rounded-2xl px-6 font-bold outline-none" />
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase px-2">Goal %</label>
+                                                    <input name="t" type="number" defaultValue="75" required className="w-full h-14 bg-slate-50 rounded-2xl px-6 font-bold outline-none" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase px-2">Sem Cap</label>
+                                                    <input name="c" type="number" defaultValue="60" required className="w-full h-14 bg-slate-50 rounded-2xl px-6 font-bold outline-none" />
+                                                </div>
+                                            </div>
+                                            <button className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl mt-4">Create Subject</button>
+                                        </form>
+                                    </div>
+                                )}
+
+                                {modal.type === 'EXTRA_DECISION' && (
                                     <div className="p-10 text-center space-y-6">
-                                        <div className="mx-auto w-16 h-16 bg-slate-50 rounded-[1.5rem] flex items-center justify-center text-slate-300"><Icons.Dashboard /></div>
-                                        <h4 className="text-2xl font-black">Preferences</h4>
+                                        <div className="mx-auto w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500"><Icons.Plus /></div>
+                                        <div>
+                                            <h4 className="text-xl font-black mb-1">Extra Session?</h4>
+                                            <p className="text-xs text-slate-400 font-medium">Log an unscheduled class for "{modal.data.name}"?</p>
+                                        </div>
                                         <div className="space-y-3">
-                                            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full h-14 bg-rose-500 rounded-2xl font-black text-white text-sm shadow-xl">Reset All Data</button>
-                                            <button onClick={() => setModal({ isOpen: false })} className="w-full h-14 bg-slate-100 rounded-2xl font-black text-slate-500 text-sm">Cancel</button>
+                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, true)} className="w-full h-14 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">Moved Slot (Uses Cap)</button>
+                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, false)} className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-lg">Bonus Class (Add to Cap)</button>
+                                            <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase">Cancel</button>
                                         </div>
                                     </div>
                                 )}
 
-                                {modal.type === 'EXTRA_CHECK' && (
-                                    <div className="p-10 text-center space-y-8">
-                                        <div className="mx-auto w-16 h-16 bg-indigo-50 rounded-[1.5rem] flex items-center justify-center text-indigo-500"><Icons.Plus /></div>
-                                        <div>
-                                            <h4 className="text-2xl font-black text-slate-900 mb-2">Extra Session?</h4>
-                                            <p className="text-xs font-bold text-slate-400 leading-relaxed">Log an additional slot for "{modal.data.name}"?</p>
-                                        </div>
+                                {modal.type === 'PREFS' && (
+                                    <div className="p-10 space-y-6 text-center">
+                                        <div className="mx-auto w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300"><Icons.Dashboard /></div>
+                                        <h4 className="text-xl font-black">Preferences</h4>
                                         <div className="space-y-3">
-                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, true)} className="w-full h-14 bg-indigo-600 rounded-2xl font-black text-white text-sm shadow-xl">Moved Slot (Uses Cap)</button>
-                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, false)} className="w-full h-14 bg-slate-900 rounded-2xl font-black text-white text-sm shadow-xl">Bonus Class (Add to Cap)</button>
-                                            <button onClick={() => setModal({ isOpen: false })} className="w-full h-14 bg-slate-100 rounded-2xl font-black text-slate-500 text-sm">Cancel</button>
+                                            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full h-14 bg-rose-500 text-white rounded-2xl font-black shadow-xl">Wipe All Data</button>
+                                            <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase">Close</button>
                                         </div>
                                     </div>
                                 )}

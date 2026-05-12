@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BunkMate Pro | Attendance Tracker</title>
+    <!-- Favicon using the SVG Logo -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'><path d='M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z'/><path d='M9 12l2 2 4-4' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+            background-color: #F8FAFC;
+        }
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.8); 
+            backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.4); 
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        input[type='range']::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #4f46e5;
+            border: 4px solid white;
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
+            cursor: pointer;
+        }
+        .animate-float { animation: float 4s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+        
+        @media (min-width: 1024px) {
+            .dashboard-grid {
+                display: grid;
+                grid-template-columns: 380px 1fr;
+                gap: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-900 overflow-x-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        const Logo = ({ size = 48, className = "" }) => (
+            <svg 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg"
+                className={`${className}`}
+            >
+                <path d="M12 2L3 7V13C3 18.55 6.84 23.74 12 25C17.16 23.74 21 18.55 21 13V7L12 2Z" fill="currentColor" className="text-indigo-600" />
+                <path 
+                    d="M9 13.5L11 15.5L15 11.5" 
+                    stroke="white" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (iconRef.current && window.lucide) {
+                    iconRef.current.innerHTML = '';
+                    const iconElement = window.lucide.createIcons({
+                        icons: { [name]: window.lucide[name] },
+                        attrs: {
+                            stroke: "currentColor",
+                            "stroke-width": 2.5,
+                            "stroke-linecap": "round",
+                            "stroke-linejoin": "round",
+                            width: size,
+                            height: size,
+                            class: className
+                        }
+                    });
+                }
+            }, [name, size, className]);
+            return <span ref={iconRef} className={`inline-flex items-center justify-center ${className}`} />;
+        };
+
+        const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+        const calculateStats = (logs, target, totalCap) => {
+            const validLogs = logs.filter(l => l.status !== 'canceled');
+            const present = validLogs.filter(l => l.status === 'present').length;
+            const absent = validLogs.filter(l => l.status === 'absent').length;
+            const conducted = present + absent;
+            
+            const percentage = conducted === 0 ? 100 : (present / conducted) * 100;
+            const remainingSlots = Math.max(0, totalCap - conducted);
+            const maxPossible = totalCap === 0 ? 0 : ((present + remainingSlots) / totalCap) * 100;
+            
+            const targetDec = target / 100;
+            let safeToSkip = 0;
+            let needToAttend = 0;
+
+            if (percentage >= target) {
+                // Calculation: (P) / (C + X) >= T -> X <= P/T - C
+                safeToSkip = Math.floor(present / targetDec - conducted);
+                safeToSkip = Math.max(0, Math.min(safeToSkip, remainingSlots));
+            } else {
+                // Calculation: (P + Y) / (C + Y) >= T -> Y >= (TC - P) / (1 - T)
+                needToAttend = Math.ceil((targetDec * conducted - present) / (1 - targetDec));
+            }
+
+            return { 
+                percentage, safeToSkip, needToAttend, conducted, 
+                remainingSlots, maxPossible, isImpossible: maxPossible < target,
+                present, absent
+            };
+        };
+
+        function App() {
+            const [user, setUser] = useState(() => localStorage.getItem('bm_user'));
+            const [authMode, setAuthMode] = useState(user ? 'none' : 'login'); // 'login', 'signup', 'none'
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [subjects, setSubjects] = useState(() => JSON.parse(localStorage.getItem('bm_subs')) || []);
+            const [timetable, setTimetable] = useState(() => JSON.parse(localStorage.getItem('bm_tt')) || { 
+                Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] 
+            });
+            const [selectedSubId, setSelectedSubId] = useState(null);
+            
+            // Simulation State
+            const [simAttend, setSimAttend] = useState(0);
+            const [simSkip, setSimSkip] = useState(0);
+
+            useEffect(() => {
+                localStorage.setItem('bm_subs', JSON.stringify(subjects));
+                localStorage.setItem('bm_tt', JSON.stringify(timetable));
+            }, [subjects, timetable]);
+
+            const logAttendance = (id, status, isExtra = false) => {
+                const todayStr = new Date().toDateString();
+                const sub = subjects.find(s => s.id === id);
+                const alreadyMarked = sub.logs.some(l => new Date(l.date).toDateString() === todayStr);
+                
+                if (alreadyMarked && !isExtra) {
+                    if(!confirm(`You already marked attendance for ${sub.name} today. Log as an extra session?`)) return;
+                }
+
+                setSubjects(prev => prev.map(s => {
+                    if (s.id === id) {
+                        const newLogs = [{ id: Date.now(), status, date: new Date().toISOString() }, ...s.logs];
+                        return { ...s, logs: newLogs };
+                    }
+                    return s;
+                }));
+            };
+
+            if (authMode !== 'none') {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+                        <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-500">
+                            <div className="bg-slate-900 p-12 text-center text-white relative">
+                                <div className="mx-auto w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center mb-6 shadow-2xl animate-float">
+                                    <Logo size={40} className="text-white" />
+                                </div>
+                                <h1 className="text-3xl font-black tracking-tight">BunkMate Pro</h1>
+                                <p className="text-indigo-400 text-[10px] uppercase font-black tracking-[0.2em] mt-2">Attendance Simplified</p>
+                            </div>
+                            
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                const username = e.target.username.value;
+                                setUser(username);
+                                localStorage.setItem('bm_user', username);
+                                setAuthMode('none');
+                            }} className="p-10 space-y-5">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Username</label>
+                                    <input name="username" required className="w-full h-14 bg-slate-100 rounded-2xl border-none px-6 font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="e.g. topper_alex" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
+                                    <input name="password" type="password" required className="w-full h-14 bg-slate-100 rounded-2xl border-none px-6 font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="••••••••" />
+                                </div>
+                                
+                                <button type="submit" className="w-full h-16 bg-slate-900 text-white rounded-2xl font-black hover:bg-indigo-600 transition-all shadow-xl active:scale-95 text-lg">
+                                    {authMode === 'login' ? 'Launch Dashboard' : 'Create Account'}
+                                </button>
+                                
+                                <div className="text-center pt-2">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+                                        className="text-[11px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"
+                                    >
+                                        {authMode === 'login' ? "Don't have an account? Sign Up" : "Already a member? Sign In"}
+                                    </button>
+                                </div>
+                                
+                                <p className="text-center text-[10px] text-slate-300 font-bold mt-4">
+                                    By signing in, you agree to track your bunks responsibly.
+                                </p>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-7xl mx-auto px-6 md:px-12 pb-32 pt-8">
+                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
+                                <Logo size={24} />
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Hi, {user}</h2>
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> BunkMate Pro System Active
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setActiveTab('settings')} className="h-12 w-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all border border-slate-100">
+                                <Icon name="Settings" />
+                            </button>
+                            <button onClick={() => { if(confirm("Logout?")) {localStorage.clear(); window.location.reload();}}} className="h-12 px-6 bg-rose-50 rounded-2xl font-black text-xs text-rose-600 flex items-center gap-2 hover:bg-rose-100 transition-all border border-rose-100">
+                                <Icon name="LogOut" size={16} /> Exit
+                            </button>
+                        </div>
+                    </header>
+
+                    {activeTab === 'dashboard' && (
+                        <div className="dashboard-grid space-y-8 lg:space-y-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            {}
+                            <div className="space-y-6">
+                                <div className="bg-indigo-600 rounded-[3rem] p-8 text-white shadow-2xl relative overflow-hidden h-fit lg:sticky lg:top-8">
+                                    <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12">
+                                        <Logo size={240} />
+                                    </div>
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-center mb-8">
+                                            <span className="text-[10px] bg-white/20 px-4 py-1.5 rounded-full font-black uppercase tracking-widest">Today's Routine</span>
+                                            <Icon name="Calendar" />
+                                        </div>
+                                        <div className="space-y-4">
+                                            {(() => {
+                                                const today = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+                                                const todaysIds = timetable[today] || [];
+                                                if (todaysIds.length === 0) return (
+                                                    <div className="text-center py-12 opacity-50 bg-white/5 rounded-[2rem] border border-white/10">
+                                                        <Icon name="Coffee" size={48} className="mx-auto mb-3" />
+                                                        <p className="text-xs font-bold italic">No classes today. Zero bunking required!</p>
+                                                    </div>
+                                                );
+                                                return todaysIds.map((subId, idx) => {
+                                                    const sub = subjects.find(s => s.id === subId);
+                                                    if (!sub) return null;
+                                                    return (
+                                                        <div key={`${subId}-${idx}`} className="flex items-center justify-between p-5 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 hover:bg-white/20 transition-all group">
+                                                            <div className="max-w-[140px]">
+                                                                <p className="font-black text-sm truncate">{sub.name}</p>
+                                                                <p className="text-[9px] font-bold opacity-60">Daily Slot {idx + 1}</p>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={() => logAttendance(sub.id, 'present')} className="h-11 w-11 bg-emerald-500 rounded-xl flex items-center justify-center hover:scale-110 active:scale-90 shadow-lg transition-transform"><Icon name="Check" /></button>
+                                                                <button onClick={() => logAttendance(sub.id, 'absent')} className="h-11 w-11 bg-rose-500 rounded-xl flex items-center justify-center hover:scale-110 active:scale-90 shadow-lg transition-transform"><Icon name="X" /></button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {}
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 h-fit">
+                                {subjects.map(sub => {
+                                    const stats = calculateStats(sub.logs, sub.target, sub.totalExpected);
+                                    const isDanger = stats.percentage < sub.target;
+                                    return (
+                                        <div key={sub.id} className="bg-white rounded-[3rem] p-8 shadow-sm border border-slate-100 transition-all hover:shadow-2xl hover:-translate-y-2 group relative overflow-hidden">
+                                            <div className="absolute -right-4 -top-4 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
+                                                <Logo size={120} />
+                                            </div>
+                                            <div className="flex justify-between items-start mb-6">
+                                                <div className="max-w-[65%]">
+                                                    <h4 className="text-2xl font-black text-slate-800 truncate tracking-tight">{sub.name}</h4>
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2 py-0.5 bg-slate-50 rounded-md">Goal: {sub.target}%</span>
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2 py-0.5 bg-slate-50 rounded-md">Cap: {sub.totalExpected}</span>
+                                                    </div>
+                                                </div>
+                                                <div className={`text-3xl font-black tabular-nums ${isDanger ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                    {stats.percentage.toFixed(0)}%
+                                                </div>
+                                            </div>
+                                            <div className="h-4 w-full bg-slate-50 rounded-full mb-8 overflow-hidden p-1 border border-slate-100">
+                                                <div className={`h-full rounded-full transition-all duration-1000 ${isDanger ? 'bg-rose-500' : 'bg-indigo-600'}`} style={{ width: `${Math.min(100, stats.percentage)}%` }} />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                                <div className={`p-5 rounded-3xl border transition-colors ${isDanger ? 'bg-rose-50/50 border-rose-100 text-rose-600' : 'bg-emerald-50/50 border-emerald-100 text-emerald-600'}`}>
+                                                    <p className="text-[9px] font-black opacity-60 uppercase mb-2">{!isDanger ? 'Safe to Bunk' : 'Must Attend'}</p>
+                                                    <p className="text-base font-black">
+                                                        {stats.isImpossible ? 'Impossible' : stats.safeToSkip > 0 ? `${stats.safeToSkip} Bunks` : `${stats.needToAttend} Next`}
+                                                    </p>
+                                                </div>
+                                                <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-3xl text-slate-700">
+                                                    <p className="text-[9px] font-black opacity-60 uppercase mb-2">Max Possible</p>
+                                                    <p className="text-base font-black">{stats.maxPossible.toFixed(1)}%</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('forecast'); }} className="flex-1 h-12 rounded-2xl bg-slate-100 text-[11px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2">
+                                                    <Icon name="Calculator" size={16} /> Simulator
+                                                </button>
+                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('history'); }} className="flex-1 h-12 rounded-2xl bg-slate-100 text-[11px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2">
+                                                    <Icon name="History" size={16} /> Logs
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {subjects.length === 0 && (
+                                    <div className="col-span-full py-32 text-center border-4 border-dashed border-slate-100 rounded-[3rem] bg-white group cursor-pointer" onClick={() => setActiveTab('subjects')}>
+                                        <Icon name="PlusCircle" size={64} className="mx-auto mb-6 text-slate-200 group-hover:text-indigo-400 group-hover:scale-110 transition-all" />
+                                        <p className="text-slate-400 font-black text-lg">Define your courses to start the track</p>
+                                        <p className="text-slate-300 text-sm font-bold">Manage Subjects Tab →</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {}
+                    {activeTab === 'subjects' && (
+                        <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500">
+                            <h3 className="text-3xl font-black tracking-tight">Manage Courses</h3>
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                const newSub = {
+                                    id: Date.now(),
+                                    name: e.target.name.value,
+                                    target: parseInt(e.target.target.value),
+                                    totalExpected: parseInt(e.target.cap.value),
+                                    logs: []
+                                };
+                                setSubjects([...subjects, newSub]);
+                                e.target.reset();
+                            }} className="bg-white p-10 rounded-[3rem] shadow-sm space-y-6 border border-slate-100">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Subject Name</label>
+                                    <input name="name" required className="w-full h-16 bg-slate-50 rounded-[1.5rem] px-8 font-black outline-none border-2 border-transparent focus:border-indigo-100 transition-all text-lg" placeholder="e.g. Distributed Systems" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Target % Goal</label>
+                                        <input name="target" type="number" defaultValue="75" required className="w-full h-16 bg-slate-50 rounded-[1.5rem] px-8 font-black outline-none border-2 border-transparent focus:border-indigo-100 transition-all text-lg" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Total Classes (Cap)</label>
+                                        <input name="cap" type="number" required className="w-full h-16 bg-slate-50 rounded-[1.5rem] px-8 font-black outline-none border-2 border-transparent focus:border-indigo-100 transition-all text-lg" placeholder="60" />
+                                    </div>
+                                </div>
+                                <button className="w-full h-16 bg-slate-900 text-white font-black rounded-[1.5rem] hover:bg-indigo-600 transition-all shadow-2xl text-lg">Create Course Profile</button>
+                            </form>
+                            <div className="space-y-4">
+                                {subjects.map(s => (
+                                    <div key={s.id} className="bg-white p-6 rounded-[2rem] flex justify-between items-center shadow-sm border border-slate-100 hover:border-indigo-100 transition-colors">
+                                        <div className="flex items-center gap-5">
+                                            <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center font-black text-white text-xl">{s.name[0]}</div>
+                                            <div>
+                                                <p className="font-black text-slate-800 text-lg">{s.name}</p>
+                                                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Goal: {s.target}% • Sem Cap: {s.totalExpected}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => { if(confirm("Erase subject?")) setSubjects(subjects.filter(x => x.id !== s.id)) }} className="text-slate-300 hover:text-rose-500 transition-colors p-4"><Icon name="Trash2" size={24} /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {}
+                    {activeTab === 'forecast' && (
+                        <div className="max-w-xl mx-auto pt-8 pb-20 space-y-6 animate-in slide-in-from-right-4 duration-500">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setActiveTab('dashboard')} className="h-12 w-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400 border border-slate-100"><Icon name="ChevronLeft"/></button>
+                                <h2 className="text-2xl font-black">Attendance Sandbox</h2>
+                            </div>
+                            {(() => {
+                                const sub = subjects.find(s => s.id === selectedSubId);
+                                if (!sub) return <p className="text-center py-20 text-slate-400 font-bold">Select a subject from the dashboard first.</p>;
+                                
+                                const baseStats = calculateStats(sub.logs, sub.target, sub.totalExpected);
+                                const vP = baseStats.present + simAttend;
+                                const vC = baseStats.conducted + simAttend + simSkip;
+                                const vPerc = vC === 0 ? 100 : (vP / vC) * 100;
+                                const isSafe = vPerc >= sub.target;
+
+                                return (
+                                    <div className="space-y-6">
+                                        <div className={`p-10 rounded-[3.5rem] text-white text-center shadow-2xl transition-colors duration-500 ${isSafe ? 'bg-slate-900' : 'bg-rose-600'}`}>
+                                            <p className="text-[10px] font-black opacity-50 uppercase tracking-widest">Projected Status</p>
+                                            <h3 className="text-7xl font-black tabular-nums my-2">{vPerc.toFixed(1)}%</h3>
+                                            <p className="text-xs font-bold uppercase">{isSafe ? 'Above Goal' : 'Below Goal'}</p>
+                                        </div>
+                                        <div className="bg-white p-10 rounded-[3.5rem] shadow-sm ring-1 ring-slate-100 space-y-10">
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-end">
+                                                    <label className="text-[10px] font-black uppercase text-slate-400">If I attend...</label>
+                                                    <span className="text-lg font-black text-indigo-600">{simAttend} classes</span>
+                                                </div>
+                                                <input type="range" min="0" max={baseStats.remainingSlots} value={simAttend} onChange={e => setSimAttend(parseInt(e.target.value))} className="w-full accent-indigo-600" />
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-end">
+                                                    <label className="text-[10px] font-black uppercase text-slate-400">If I skip...</label>
+                                                    <span className="text-lg font-black text-rose-500">{simSkip} classes</span>
+                                                </div>
+                                                <input type="range" min="0" max={Math.max(0, baseStats.remainingSlots - simAttend)} value={simSkip} onChange={e => setSimSkip(parseInt(e.target.value))} className="w-full accent-rose-500" />
+                                            </div>
+                                            <button onClick={() => {setSimAttend(0); setSimSkip(0);}} className="w-full h-14 rounded-2xl bg-slate-50 text-slate-400 font-black text-[10px] uppercase tracking-widest border border-slate-100 hover:bg-slate-100 transition-colors">Reset Sandbox</button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
+
+                    {}
+                    <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[90%] max-w-[420px] bg-slate-900/95 backdrop-blur-2xl h-24 rounded-[3.5rem] shadow-[0_25px_60px_rgba(0,0,0,0.4)] flex items-center justify-around px-6 border border-white/10 z-50">
+                        <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1.5 p-5 rounded-[2rem] transition-all ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/30' : 'text-slate-500 hover:text-white'}`}>
+                            <Icon name="Layout" size={24} />
+                        </button>
+                        <button onClick={() => setActiveTab('subjects')} className={`flex flex-col items-center gap-1.5 p-5 rounded-[2rem] transition-all ${activeTab === 'subjects' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/30' : 'text-slate-500 hover:text-white'}`}>
+                            <Icon name="BookOpen" size={24} />
+                        </button>
+                        <button onClick={() => setActiveTab('timetable')} className={`flex flex-col items-center gap-1.5 p-5 rounded-[2rem] transition-all ${activeTab === 'timetable' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/30' : 'text-slate-500 hover:text-white'}`}>
+                            <Icon name="CalendarDays" size={24} />
+                        </button>
+                        <div className="w-[1px] h-10 bg-white/10 mx-1"></div>
+                        <div className="flex items-center justify-center opacity-40 grayscale group hover:grayscale-0 transition-all">
+                             <Logo size={28} />
+                        </div>
+                    </nav>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -88,7 +88,7 @@
         const calculateStats = (logs, target, totalCap) => {
             const conducted = logs.filter(l => l.status === 'present' || l.status === 'absent').length;
             const present = logs.filter(l => l.status === 'present').length;
-            const slotsUsed = logs.length; // All logs (present, absent, canceled, reschedule) use a "slot" in time
+            const slotsUsed = logs.length; // All logs consume a semester slot
             
             const percentage = conducted === 0 ? 100 : (present / conducted) * 100;
             const remainingSlots = Math.max(0, totalCap - slotsUsed);
@@ -99,9 +99,11 @@
             let needToAttend = 0;
 
             if (percentage >= target) {
+                // Calculation: present / (conducted + safeToBunk) >= targetDec
                 safeToBunk = Math.floor(present / targetDec - conducted);
                 safeToBunk = Math.max(0, Math.min(safeToBunk, remainingSlots));
             } else {
+                // Calculation: (present + needToAttend) / (conducted + needToAttend) >= targetDec
                 needToAttend = Math.ceil((targetDec * conducted - present) / (1 - targetDec));
             }
 
@@ -114,7 +116,7 @@
 
             return { 
                 percentage, safeToBunk, needToAttend, conducted, 
-                remainingSlots, maxPossible, streak, 
+                present, remainingSlots, maxPossible, streak, 
                 isImpossible: maxPossible < target 
             };
         };
@@ -122,19 +124,18 @@
         const { useState, useEffect, useMemo } = React;
 
         function App() {
-            // AUTH STATE
             const [user, setUser] = useState(() => localStorage.getItem('bm_p_current_user'));
             const [authMode, setAuthMode] = useState(localStorage.getItem('bm_p_current_user') ? 'none' : 'login');
             const [authError, setAuthError] = useState("");
 
-            // APP DATA STATE
             const [subjects, setSubjects] = useState([]);
             const [timetable, setTimetable] = useState({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] });
             
-            // UI STATE
             const [activeTab, setActiveTab] = useState('dashboard');
             const [modal, setModal] = useState({ isOpen: false, type: null, data: null });
             const [selectedSubId, setSelectedSubId] = useState(null);
+            
+            // Simulator Variables
             const [simAttend, setSimAttend] = useState(0);
             const [simBunk, setSimBunk] = useState(0);
 
@@ -160,7 +161,6 @@
                 const p = formData.get('p');
 
                 if (!u || !p) return setAuthError("Please fill all fields.");
-
                 const users = JSON.parse(localStorage.getItem('bm_p_users') || "{}");
 
                 if (authMode === 'signup') {
@@ -197,7 +197,6 @@
                 const dayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
                 const scheduledToday = (timetable[dayName] || []).filter(sid => sid === id).length;
 
-                // Multi-session logic: Trigger "Extra" logic only if they log more than scheduled for the day
                 if (!isExtra && todaysLogsCount >= scheduledToday && scheduledToday > 0) {
                     setModal({ isOpen: true, type: 'EXTRA_DECISION', data: { id, status, name: sub.name } });
                     return;
@@ -226,7 +225,7 @@
             const dailyAnalysis = useMemo(() => {
                 const dayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
                 const slots = timetable[dayName] || [];
-                if (slots.length === 0) return { status: "Relax Mode", color: "bg-slate-800", desc: "No classes today." };
+                if (slots.length === 0) return { status: "Relax Mode", color: "bg-slate-800", desc: "No classes scheduled for today." };
 
                 const subCounts = slots.reduce((acc, id) => { acc[id] = (acc[id] || 0) + 1; return acc; }, {});
                 let canBunkAll = true;
@@ -234,8 +233,12 @@
                 Object.entries(subCounts).forEach(([sid, count]) => {
                     const sub = subjects.find(s => s.id === sid);
                     if (!sub) return;
+                    
+                    // Simulation: Add N absences for N slots today
                     const simulatedLogs = [...sub.logs];
-                    for(let i=0; i<count; i++) simulatedLogs.push({ status: 'absent' });
+                    for(let i=0; i<count; i++) {
+                        simulatedLogs.push({ status: 'absent', date: new Date().toISOString() });
+                    }
                     const stats = calculateStats(simulatedLogs, sub.target, sub.totalExpected);
                     if (stats.percentage < sub.target) canBunkAll = false;
                 });
@@ -243,7 +246,7 @@
                 return {
                     status: canBunkAll ? "Safe Day" : "Critical Day",
                     color: canBunkAll ? "bg-indigo-600" : "bg-rose-600",
-                    desc: canBunkAll ? "Bunking everything today keeps you above your targets." : "Bunking all today will put you below your target in some courses."
+                    desc: canBunkAll ? "You can bunk everything today and still stay above all your targets." : "Bunking everything today will push some courses below your target percentage."
                 };
             }, [subjects, timetable]);
 
@@ -262,10 +265,10 @@
                             </div>
                             <form onSubmit={handleAuth} className="p-10 space-y-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Unique Username</label>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Username</label>
                                     <div className="relative">
                                         <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"><Icons.User/></div>
-                                        <input name="u" required className="w-full h-14 bg-slate-100 rounded-2xl pl-12 pr-6 font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="e.g. james_college" />
+                                        <input name="u" required className="w-full h-14 bg-slate-100 rounded-2xl pl-12 pr-6 font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="Username" />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
@@ -281,7 +284,7 @@
                                 </button>
                                 <div className="text-center pt-2">
                                     <button type="button" onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthError(""); }} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors">
-                                        {authMode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Log In"}
+                                        {authMode === 'login' ? "New here? Create Profile" : "Existing User? Log In"}
                                     </button>
                                 </div>
                             </form>
@@ -302,20 +305,18 @@
                                 <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Track Your Bunks • {user}</p>
                             </div>
                         </div>
-                        <div className="flex gap-3">
-                            <button onClick={() => setModal({ isOpen: true, type: 'USER_PREFS' })} className="h-12 px-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-all font-black text-[10px] uppercase">
-                                <Icons.User /> Profile
-                            </button>
-                        </div>
+                        <button onClick={() => setModal({ isOpen: true, type: 'USER_PREFS' })} className="h-12 px-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-all font-black text-[10px] uppercase">
+                            <Icons.User /> {user}
+                        </button>
                     </header>
 
                     {activeTab === 'dashboard' && (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
-                            {/* LEFT SIDE: Daily Status and Routine */}
+                            {/* LEFT SIDE: Daily Impact & Routine */}
                             <div className="lg:col-span-4 space-y-6">
                                 <div className={`p-8 rounded-[3rem] text-white shadow-xl relative overflow-hidden transition-all duration-700 ${dailyAnalysis.color}`}>
                                     <div className="relative z-10">
-                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Today's Scenario</p>
+                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Daily Scenario</p>
                                         <h4 className="text-2xl font-black mb-2">{dailyAnalysis.status}</h4>
                                         <p className="text-xs font-medium opacity-80 leading-relaxed">{dailyAnalysis.desc}</p>
                                     </div>
@@ -323,9 +324,7 @@
                                 </div>
 
                                 <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-slate-100 ring-1 ring-slate-100">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex justify-between items-center">
-                                        Today's Routine <Icons.Calendar />
-                                    </p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex justify-between items-center">Today's Routine <Icons.Calendar /></p>
                                     <div className="space-y-4">
                                         {(() => {
                                             const dayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
@@ -335,16 +334,16 @@
                                                 const sub = subjects.find(s => s.id === sid);
                                                 if (!sub) return null;
                                                 return (
-                                                    <div key={`${sid}-${idx}`} className="p-5 bg-slate-50 rounded-[2rem] border border-slate-100 hover:shadow-md transition-all group">
+                                                    <div key={`${sid}-${idx}`} className="p-5 bg-slate-50 rounded-[2rem] border border-slate-100 group">
                                                         <div className="flex justify-between items-center mb-4">
                                                             <p className="font-bold text-slate-800 text-sm truncate pr-2">{sub.name}</p>
                                                             <span className="text-[9px] font-black text-slate-300 uppercase shrink-0">Slot {idx+1}</span>
                                                         </div>
                                                         <div className="grid grid-cols-4 gap-2">
-                                                            <button onClick={() => logAttendance(sub.id, 'present')} className="h-11 bg-emerald-500 rounded-xl text-white flex items-center justify-center hover:bg-emerald-600 transition-all shadow-sm active:scale-95"><Icons.Check/></button>
-                                                            <button onClick={() => logAttendance(sub.id, 'absent')} className="h-11 bg-rose-500 rounded-xl text-white flex items-center justify-center hover:bg-rose-600 transition-all shadow-sm active:scale-95"><Icons.X/></button>
-                                                            <button onClick={() => logAttendance(sub.id, 'canceled')} title="Canceled" className="h-11 bg-slate-200 rounded-xl text-slate-500 flex items-center justify-center hover:bg-slate-300 transition-all shadow-sm active:scale-95"><Icons.Canceled/></button>
-                                                            <button onClick={() => logAttendance(sub.id, 'rescheduled')} title="Rescheduled" className="h-11 bg-indigo-500 rounded-xl text-white flex items-center justify-center hover:bg-indigo-600 transition-all shadow-sm active:scale-95"><Icons.Reschedule/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'present')} className="h-11 bg-emerald-500 rounded-xl text-white flex items-center justify-center hover:bg-emerald-600 transition-all active:scale-95"><Icons.Check/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'absent')} className="h-11 bg-rose-500 rounded-xl text-white flex items-center justify-center hover:bg-rose-600 transition-all active:scale-95"><Icons.X/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'canceled')} className="h-11 bg-slate-200 rounded-xl text-slate-500 flex items-center justify-center hover:bg-slate-300 transition-all active:scale-95"><Icons.Canceled/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'rescheduled')} className="h-11 bg-indigo-500 rounded-xl text-white flex items-center justify-center hover:bg-indigo-600 transition-all active:scale-95"><Icons.Reschedule/></button>
                                                         </div>
                                                     </div>
                                                 );
@@ -354,36 +353,36 @@
                                 </div>
                             </div>
 
-                            {/* RIGHT SIDE: Subject Cards Grid */}
+                            {/* RIGHT SIDE: Subject Overview */}
                             <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6 h-fit">
                                 {subjects.length === 0 ? (
                                     <div className="col-span-full bg-white rounded-[3rem] p-20 text-center border border-dashed border-slate-200">
                                         <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-200 mb-4"><Icons.Courses /></div>
-                                        <p className="text-slate-400 font-bold">No subjects tracked yet.<br/><span className="text-xs uppercase tracking-tighter">Add them in the Courses tab.</span></p>
+                                        <p className="text-slate-400 font-bold">No subjects added.<br/><span className="text-xs uppercase">Go to Courses to start.</span></p>
                                     </div>
                                 ) : subjects.map(sub => {
                                     const stats = calculateStats(sub.logs, sub.target, sub.totalExpected);
                                     const isDanger = stats.percentage < sub.target;
                                     return (
-                                        <div key={sub.id} className="bg-white rounded-[3rem] p-8 shadow-sm border border-slate-100 hover:shadow-2xl transition-all relative overflow-hidden group min-w-0">
-                                            <div className="flex justify-between items-start mb-6 relative z-10 gap-2">
+                                        <div key={sub.id} className="bg-white rounded-[3rem] p-8 shadow-sm border border-slate-100 hover:shadow-2xl transition-all relative group">
+                                            <div className="flex justify-between items-start mb-6 gap-2">
                                                 <div className="min-w-0">
-                                                    <h4 className="text-xl font-black text-slate-800 tracking-tight truncate">{sub.name}</h4>
-                                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Goal: {sub.target}%</span>
-                                                        {stats.streak >= 3 && <span className="flex items-center gap-1 bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase whitespace-nowrap"><Icons.Flame/> {stats.streak} Streak</span>}
+                                                    <h4 className="text-xl font-black text-slate-800 truncate">{sub.name}</h4>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Goal: {sub.target}%</span>
+                                                        {stats.streak >= 3 && <span className="flex items-center gap-1 bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase"><Icons.Flame/> {stats.streak} Streak</span>}
                                                     </div>
                                                 </div>
                                                 <div className={`text-3xl font-black tabular-nums shrink-0 ${isDanger ? 'text-rose-500' : 'text-emerald-500'}`}>{stats.percentage.toFixed(0)}%</div>
                                             </div>
-                                            <div className="h-3 w-full bg-slate-100 rounded-full mb-8 overflow-hidden relative z-10">
+                                            <div className="h-3 w-full bg-slate-100 rounded-full mb-8 overflow-hidden relative">
                                                 <div className={`h-full transition-all duration-1000 ${isDanger ? 'bg-rose-500' : 'bg-indigo-600'}`} style={{ width: `${Math.min(100, stats.percentage)}%` }} />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
+                                            <div className="grid grid-cols-2 gap-4 mb-6">
                                                 <div className={`p-4 rounded-2xl border text-center ${isDanger ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1 whitespace-nowrap tracking-tighter">{!isDanger ? 'Safe to Bunk' : 'Must Attend'}</p>
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-tighter">{!isDanger ? 'Safe to Bunk' : 'Must Attend'}</p>
                                                     <p className={`text-sm font-black ${isDanger ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                        {stats.isImpossible ? 'Impossible' : stats.safeToBunk > 0 ? `${stats.safeToBunk} more` : `${stats.needToAttend} next`}
+                                                        {stats.isImpossible ? 'Impossible' : stats.safeToBunk > 0 ? `${stats.safeToBunk} slots` : `${stats.needToAttend} next`}
                                                     </p>
                                                 </div>
                                                 <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
@@ -391,8 +390,8 @@
                                                     <p className="text-sm font-black text-slate-800">{stats.remainingSlots} Slots</p>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 relative z-10">
-                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('forecast'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">What If?</button>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { setSelectedSubId(sub.id); setSimAttend(0); setSimBunk(0); setActiveTab('forecast'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">Sandbox</button>
                                                 <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('history'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">Logs</button>
                                             </div>
                                         </div>
@@ -406,16 +405,16 @@
                         <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500">
                             <div className="flex justify-between items-center mb-8">
                                 <h2 className="text-3xl font-black text-slate-900 tracking-tight">Courses</h2>
-                                <button onClick={() => setModal({ isOpen: true, type: 'ADD_SUB' })} className="h-14 px-6 bg-slate-900 text-white rounded-2xl font-black flex items-center gap-3 shadow-xl hover:bg-indigo-600 transition-all"><Icons.Plus /> New Subject</button>
+                                <button onClick={() => setModal({ isOpen: true, type: 'ADD_SUB' })} className="h-14 px-6 bg-slate-900 text-white rounded-2xl font-black flex items-center gap-3 shadow-xl hover:bg-indigo-600 transition-all"><Icons.Plus /> Add New</button>
                             </div>
                             <div className="space-y-4">
                                 {subjects.map(s => (
-                                    <div key={s.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm flex items-center justify-between border border-slate-100 ring-1 ring-slate-100 transition-all hover:ring-indigo-100">
+                                    <div key={s.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm flex items-center justify-between border border-slate-100 transition-all hover:ring-indigo-100 ring-1 ring-slate-100">
                                         <div className="flex items-center gap-5 min-w-0">
                                             <div className="w-14 h-14 bg-slate-900 rounded-[1.25rem] flex items-center justify-center text-white font-black text-xl shrink-0">{s.name[0]}</div>
                                             <div className="min-w-0">
                                                 <h4 className="font-bold text-slate-800 text-lg truncate">{s.name}</h4>
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Goal: {s.target}% • Cap: {s.totalExpected}</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Goal: {s.target}% • Sem Cap: {s.totalExpected}</p>
                                             </div>
                                         </div>
                                         <button onClick={() => setModal({ isOpen: true, type: 'DELETE_CONFIRM', data: { id: s.id, name: s.name } })} className="w-12 h-12 rounded-2xl text-rose-500 hover:bg-rose-50 transition-all flex items-center justify-center shrink-0"><Icons.Trash /></button>
@@ -446,7 +445,7 @@
                                                     </div>
                                                 );
                                             })}
-                                            <button onClick={() => setModal({ isOpen: true, type: 'ADD_TO_TT', data: { day } })} className="w-full h-12 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 text-[10px] font-black uppercase hover:border-indigo-200 hover:text-indigo-400 transition-all">Add Slot</button>
+                                            <button onClick={() => setModal({ isOpen: true, type: 'ADD_TO_TT', data: { day } })} className="w-full h-12 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 text-[10px] font-black uppercase hover:border-indigo-200 hover:text-indigo-400 transition-all">Add Class</button>
                                         </div>
                                     </div>
                                 ))}
@@ -458,46 +457,60 @@
                         <div className="max-w-xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-500">
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setActiveTab('dashboard')} className="w-12 h-12 bg-white rounded-2xl border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm"><Icons.ChevronLeft/></button>
-                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">What-If Sandbox</h2>
+                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">What-If Simulator</h2>
                             </div>
                             {selectedSubId && subjects.find(s => s.id === selectedSubId) ? (() => {
                                 const sub = subjects.find(s => s.id === selectedSubId);
                                 const stats = calculateStats(sub.logs, sub.target, sub.totalExpected);
-                                const vConducted = stats.conducted + simAttend + simBunk;
-                                const vPresent = stats.present + simAttend;
-                                const vPercent = vConducted === 0 ? 100 : (vPresent / vConducted) * 100;
-                                const vLeft = Math.max(0, stats.remainingSlots - simAttend - simBunk);
+                                
+                                // Simulation Calculation
+                                const simConducted = stats.conducted + simAttend + simBunk;
+                                const simPresent = stats.present + simAttend;
+                                const simPercentage = simConducted === 0 ? 100 : (simPresent / simConducted) * 100;
+                                const simRemaining = Math.max(0, stats.remainingSlots - simAttend - simBunk);
 
                                 return (
                                     <div className="space-y-8 pb-10">
-                                        <div className={`p-12 rounded-[3.5rem] text-white text-center shadow-2xl transition-all duration-500 ${vPercent >= sub.target ? 'bg-slate-900' : 'bg-rose-600'}`}>
+                                        {}
+                                        <div className={`p-12 rounded-[3.5rem] text-white text-center shadow-2xl transition-all duration-500 ${simPercentage >= sub.target ? 'bg-slate-900' : 'bg-rose-600'}`}>
                                             <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Projected Percentage</p>
-                                            <h3 className="text-6xl font-black tabular-nums tracking-tighter">{vPercent.toFixed(1)}%</h3>
-                                            <p className="text-xs font-black uppercase mt-4 tracking-wider">{vPercent >= sub.target ? 'Safe Zone' : 'Danger Zone'}</p>
+                                            <h3 className="text-7xl font-black tabular-nums tracking-tighter">{simPercentage.toFixed(1)}%</h3>
+                                            <p className="text-xs font-black uppercase mt-4 tracking-wider">
+                                                {simPercentage >= sub.target ? `Safe (Target: ${sub.target}%)` : `Below Target Goal`}
+                                            </p>
                                         </div>
+                                        
                                         <div className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-slate-100 ring-1 ring-slate-100 space-y-10">
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-end px-2">
-                                                    <label className="text-[11px] font-black uppercase text-slate-400">Plan to Attend</label>
-                                                    <span className="text-xl font-black text-indigo-600 tabular-nums">{simAttend} classes</span>
+                                                    <label className="text-[11px] font-black uppercase text-slate-400">If I Attend...</label>
+                                                    <span className="text-xl font-black text-indigo-600 tabular-nums">{simAttend} Classes</span>
                                                 </div>
-                                                <input type="range" min="0" max={stats.remainingSlots} value={simAttend} onChange={e => setSimAttend(parseInt(e.target.value))} />
+                                                <input type="range" min="0" max={stats.remainingSlots} value={simAttend} onChange={e => {
+                                                    const val = parseInt(e.target.value);
+                                                    setSimAttend(val);
+                                                    if(val + simBunk > stats.remainingSlots) setSimBunk(stats.remainingSlots - val);
+                                                }} />
                                             </div>
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-end px-2">
-                                                    <label className="text-[11px] font-black uppercase text-slate-400">Plan to Bunk</label>
-                                                    <span className="text-xl font-black text-rose-500 tabular-nums">{simBunk} classes</span>
+                                                    <label className="text-[11px] font-black uppercase text-slate-400">If I Bunk...</label>
+                                                    <span className="text-xl font-black text-rose-500 tabular-nums">{simBunk} Classes</span>
                                                 </div>
-                                                <input type="range" min="0" max={Math.max(0, stats.remainingSlots - simAttend)} value={simBunk} onChange={e => setSimBunk(parseInt(e.target.value))} />
+                                                <input type="range" min="0" max={stats.remainingSlots} value={simBunk} onChange={e => {
+                                                    const val = parseInt(e.target.value);
+                                                    setSimBunk(val);
+                                                    if(val + simAttend > stats.remainingSlots) setSimAttend(stats.remainingSlots - val);
+                                                }} />
                                             </div>
                                             <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-slate-400 font-bold text-sm px-2">
-                                                <span>Slots left after plan</span>
-                                                <span className="text-slate-900 font-black tabular-nums">{vLeft}</span>
+                                                <span>Remaining in Sem Cap</span>
+                                                <span className="text-slate-900 font-black tabular-nums">{simRemaining} Slots</span>
                                             </div>
                                         </div>
                                     </div>
                                 );
-                            })() : <p className="text-center py-20 text-slate-400 font-bold">Pick a subject first.</p>}
+                            })() : <p className="text-center py-20 text-slate-400 font-bold italic">Select a subject first.</p>}
                         </div>
                     )}
 
@@ -509,7 +522,7 @@
                             </div>
                             {selectedSubId && subjects.find(s => s.id === selectedSubId) ? (
                                 <div className="space-y-4 pb-10">
-                                    <button onClick={() => setModal({ isOpen: true, type: 'ADD_PAST' })} className="w-full h-16 bg-slate-900 text-white rounded-[2rem] font-black shadow-xl mb-4 hover:bg-indigo-600 transition-all">Log Past Date</button>
+                                    <button onClick={() => setModal({ isOpen: true, type: 'ADD_PAST' })} className="w-full h-16 bg-slate-900 text-white rounded-[2rem] font-black shadow-xl mb-4 hover:bg-indigo-600 transition-all">Manual Entry</button>
                                     <div className="space-y-3">
                                         {subjects.find(s => s.id === selectedSubId).logs.map(log => (
                                             <div key={log.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between shadow-sm ring-1 ring-slate-100 group transition-all hover:ring-indigo-100">
@@ -545,20 +558,20 @@
                         </div>
                     )}
 
-                    {/* FLOATING NAVIGATION */}
+                    {}
                     <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] bg-slate-900/95 backdrop-blur-xl h-20 rounded-[3rem] shadow-2xl flex items-center justify-around px-4 border border-white/10 z-[60] overflow-hidden">
                         <button onClick={() => setActiveTab('dashboard')} className={`p-4 rounded-2xl transition-all ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}><Icons.Dashboard /></button>
                         <button onClick={() => setActiveTab('subjects')} className={`p-4 rounded-2xl transition-all ${activeTab === 'subjects' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}><Icons.Courses /></button>
                         <button onClick={() => setActiveTab('timetable')} className={`p-4 rounded-2xl transition-all ${activeTab === 'timetable' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}><Icons.Calendar /></button>
                     </nav>
 
-                    {/* CUSTOM MODAL SYSTEM (No Popups) */}
+                    {/* CUSTOM MODAL SYSTEM */}
                     {modal.isOpen && (
                         <div className="fixed inset-0 modal-overlay flex items-center justify-center p-6 overflow-y-auto z-[200]">
                             <div className="bg-white w-full max-w-sm rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 my-auto">
                                 {modal.type === 'ADD_SUB' && (
                                     <div className="p-10 space-y-6">
-                                        <h4 className="text-2xl font-black text-center tracking-tight">New Subject</h4>
+                                        <h4 className="text-2xl font-black text-center tracking-tight">Add Course</h4>
                                         <form className="space-y-4" onSubmit={(e) => {
                                             e.preventDefault();
                                             const f = new FormData(e.target);
@@ -568,7 +581,7 @@
                                             setSubjects([...subjects, { id: Date.now(), name: n, target: t, totalExpected: c, logs: [] }]);
                                             setModal({ isOpen: false });
                                         }}>
-                                            <input name="n" required placeholder="Course Name" className="w-full h-14 bg-slate-50 rounded-2xl px-6 font-bold outline-none border-none ring-1 ring-slate-100 focus:ring-indigo-500/20" />
+                                            <input name="n" required placeholder="Subject Name" className="w-full h-14 bg-slate-50 rounded-2xl px-6 font-bold outline-none ring-1 ring-slate-100 focus:ring-indigo-500/20" />
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1">
                                                     <label className="text-[9px] font-black text-slate-400 uppercase px-2">Goal %</label>
@@ -576,10 +589,10 @@
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="text-[9px] font-black text-slate-400 uppercase px-2">Sem Cap</label>
-                                                    <input name="c" type="number" defaultValue="60" required className="w-full h-14 bg-slate-50 rounded-2xl px-6 font-bold outline-none ring-1 ring-slate-100" />
+                                                    <input name="c" type="number" placeholder="60" required className="w-full h-14 bg-slate-50 rounded-2xl px-6 font-bold outline-none ring-1 ring-slate-100" />
                                                 </div>
                                             </div>
-                                            <button className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl mt-4 hover:bg-indigo-600 transition-all">Create Subject</button>
+                                            <button className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl mt-4 hover:bg-indigo-600 transition-all">Confirm Subject</button>
                                             <button type="button" onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel</button>
                                         </form>
                                     </div>
@@ -589,8 +602,8 @@
                                     <div className="p-10 text-center space-y-6">
                                         <div className="mx-auto w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500"><Icons.Trash /></div>
                                         <div>
-                                            <h4 className="text-xl font-black mb-1 tracking-tight">Delete "{modal.data.name}"?</h4>
-                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">All attendance logs will be lost.</p>
+                                            <h4 className="text-xl font-black mb-1 tracking-tight">Delete Subject?</h4>
+                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest px-4">All logs for "{modal.data.name}" will be removed forever.</p>
                                         </div>
                                         <div className="space-y-3">
                                             <button onClick={() => {
@@ -601,15 +614,15 @@
                                                     return newT;
                                                 });
                                                 setModal({ isOpen: false });
-                                            }} className="w-full h-14 bg-rose-500 text-white rounded-2xl font-black shadow-lg hover:bg-rose-600 transition-all">Confirm Delete</button>
-                                            <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel</button>
+                                            }} className="w-full h-14 bg-rose-500 text-white rounded-2xl font-black shadow-lg hover:bg-rose-600 transition-all">Delete Forever</button>
+                                            <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Keep It</button>
                                         </div>
                                     </div>
                                 )}
 
                                 {modal.type === 'ADD_TO_TT' && (
                                     <div className="p-10 space-y-6">
-                                        <h4 className="text-2xl font-black text-center tracking-tight">Add to {modal.data.day}</h4>
+                                        <h4 className="text-2xl font-black text-center tracking-tight">Schedule: {modal.data.day}</h4>
                                         <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
                                             {subjects.map(s => (
                                                 <button key={s.id} onClick={() => {
@@ -619,12 +632,12 @@
                                                     setModal({ isOpen: false });
                                                 }} className="w-full p-5 bg-slate-50 hover:bg-indigo-50 rounded-2xl font-bold text-slate-700 text-left transition-all border border-slate-100 flex justify-between items-center group">
                                                     {s.name}
-                                                    <Icons.Check className="opacity-0 group-hover:opacity-100 text-indigo-500" />
+                                                    <Icons.Plus className="opacity-0 group-hover:opacity-100 text-indigo-500 w-5 h-5" />
                                                 </button>
                                             ))}
-                                            {subjects.length === 0 && <p className="text-center py-4 text-slate-400 italic font-bold">No subjects added yet.</p>}
+                                            {subjects.length === 0 && <p className="text-center py-4 text-slate-400 italic font-bold">No subjects found.</p>}
                                         </div>
-                                        <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Close</button>
+                                        <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest border-t border-slate-50 pt-4 mt-2">Close</button>
                                     </div>
                                 )}
 
@@ -633,11 +646,11 @@
                                         <div className="mx-auto w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500"><Icons.Plus /></div>
                                         <div>
                                             <h4 className="text-xl font-black mb-1 tracking-tight">Extra Session?</h4>
-                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Mark unscheduled class for "{modal.data.name}"?</p>
+                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Logging an unscheduled session for "{modal.data.name}".</p>
                                         </div>
                                         <div className="space-y-3">
-                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, true)} className="w-full h-14 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">Moved Slot (Uses Cap)</button>
-                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, false)} className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-lg">Bonus Class (Add to Cap)</button>
+                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, true)} className="w-full h-14 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">Moved Class (In Cap)</button>
+                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, false)} className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-lg">Bonus Class (+1 to Cap)</button>
                                             <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel</button>
                                         </div>
                                     </div>
@@ -645,7 +658,7 @@
 
                                 {modal.type === 'ADD_PAST' && (
                                     <div className="p-10 space-y-6">
-                                        <h4 className="text-2xl font-black text-center tracking-tight">Back-Dated Entry</h4>
+                                        <h4 className="text-2xl font-black text-center tracking-tight">Back-Dated Log</h4>
                                         <form className="space-y-4" onSubmit={(e) => {
                                             e.preventDefault();
                                             const f = new FormData(e.target);
@@ -664,7 +677,7 @@
                                                 <option value="absent">Absent</option>
                                                 <option value="canceled">Canceled</option>
                                             </select>
-                                            <button className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl mt-4 hover:bg-indigo-600 transition-all">Record Log</button>
+                                            <button className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl mt-4 hover:bg-indigo-600 transition-all">Add Past Record</button>
                                             <button type="button" onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancel</button>
                                         </form>
                                     </div>
@@ -675,18 +688,11 @@
                                         <div className="mx-auto w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center text-slate-400"><Icons.User size={32} /></div>
                                         <div>
                                             <h4 className="text-xl font-black tracking-tight">{user}</h4>
-                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">BunkMate Pro Member</p>
+                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Active Profile</p>
                                         </div>
                                         <div className="space-y-3 pt-4">
-                                            <button onClick={logout} className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl hover:bg-slate-800 transition-all">Sign Out</button>
-                                            <button onClick={() => {
-                                                const users = JSON.parse(localStorage.getItem('bm_p_users') || "{}");
-                                                delete users[user];
-                                                localStorage.setItem('bm_p_users', JSON.stringify(users));
-                                                localStorage.removeItem(`bm_p_data_${user}`);
-                                                logout();
-                                            }} className="w-full h-14 bg-rose-500 text-white rounded-2xl font-black shadow-xl hover:bg-rose-600 transition-all">Delete Account</button>
-                                            <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Close</button>
+                                            <button onClick={logout} className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black shadow-xl">Sign Out</button>
+                                            <button onClick={() => setModal({ isOpen: false })} className="w-full h-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Back</button>
                                         </div>
                                     </div>
                                 )}

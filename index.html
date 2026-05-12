@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BunkMate Pro | Attendance Shield</title>
     
-    <!-- Favicon -->
+    <!-- Favicon Logo -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'><path d='M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z'/><path d='M9 12l2 2 4-4' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>">
     
     <!-- Dependencies -->
@@ -22,6 +22,7 @@
             background-color: #F8FAFC;
             -webkit-tap-highlight-color: transparent;
             overflow-x: hidden;
+            width: 100%;
         }
         .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.5); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -90,9 +91,11 @@
             let needToAttend = 0;
 
             if (percentage >= target) {
+                // Calculation for Safe Bunks: Present / (Conducted + X) >= Target
                 safeToBunk = Math.floor(present / targetDec - conducted);
                 safeToBunk = Math.max(0, Math.min(safeToBunk, remainingSlots));
             } else {
+                // Calculation for Need to Attend: (Present + Y) / (Conducted + Y) >= Target
                 needToAttend = Math.ceil((targetDec * conducted - present) / (1 - targetDec));
             }
 
@@ -113,7 +116,7 @@
             });
             const [selectedSubId, setSelectedSubId] = useState(null);
             
-            // Simulator State
+            // Forecast Sliders
             const [simAttend, setSimAttend] = useState(0);
             const [simSkip, setSimSkip] = useState(0);
 
@@ -122,10 +125,27 @@
                 localStorage.setItem('bm_pro_tt', JSON.stringify(timetable));
             }, [subjects, timetable]);
 
-            const logAttendance = (id, status) => {
+            const logAttendance = (id, status, isExtra = false, countsInCap = true) => {
+                const sub = subjects.find(s => s.id === id);
+                const today = new Date().toISOString().split('T')[0];
+                const alreadyLoggedToday = sub.logs.some(l => l.date.startsWith(today) && l.status !== 'canceled');
+
+                if (alreadyLoggedToday && !isExtra) {
+                    if (confirm(`You've already logged ${sub.name} today. Is this an extra class?`)) {
+                        const counts = confirm("Should this extra class count towards your semester cap slots?");
+                        return logAttendance(id, status, true, counts);
+                    }
+                    return;
+                }
+
                 setSubjects(prev => prev.map(s => {
                     if (s.id === id) {
-                        return { ...s, logs: [{ id: Date.now(), status, date: new Date().toISOString() }, ...s.logs] };
+                        const newCap = (!countsInCap && isExtra) ? s.totalExpected + 1 : s.totalExpected;
+                        return { 
+                            ...s, 
+                            totalExpected: newCap,
+                            logs: [{ id: Date.now(), status, date: new Date().toISOString(), isExtra }, ...s.logs] 
+                        };
                     }
                     return s;
                 }));
@@ -133,14 +153,14 @@
 
             if (authMode !== 'none') {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-                        <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-500">
-                            <div className="bg-slate-900 p-12 text-center text-white relative">
-                                <div className="mx-auto w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center mb-4 shadow-xl animate-float">
-                                    <Icons.Logo size={32} className="text-white" />
+                    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+                        <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-500">
+                            <div className="bg-slate-900 p-8 text-center text-white relative">
+                                <div className="mx-auto w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-xl animate-float">
+                                    <Icons.Logo size={28} className="text-white" />
                                 </div>
-                                <h1 className="text-3xl font-black tracking-tight">BunkMate Pro</h1>
-                                <p className="text-indigo-400 text-[10px] uppercase font-black tracking-[0.2em] mt-2">Attendance Protection System</p>
+                                <h1 className="text-2xl font-black tracking-tight">BunkMate Pro</h1>
+                                <p className="text-indigo-400 text-[9px] uppercase font-black tracking-[0.2em] mt-1">Attendance Protection System</p>
                             </div>
                             
                             <form onSubmit={(e) => {
@@ -149,17 +169,17 @@
                                 setUser(name);
                                 localStorage.setItem('bm_pro_user', name);
                                 setAuthMode('none');
-                            }} className="p-10 space-y-5">
+                            }} className="p-8 space-y-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Student Username</label>
-                                    <input name="username" required className="w-full h-14 bg-slate-100 rounded-2xl px-6 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="Enter unique ID" />
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Username</label>
+                                    <input name="username" required className="w-full h-12 bg-slate-100 rounded-xl px-4 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="Enter unique ID" />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Access Key</label>
-                                    <input name="password" type="password" required className="w-full h-14 bg-slate-100 rounded-2xl px-6 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="••••••••" />
+                                    <input name="password" type="password" required className="w-full h-12 bg-slate-100 rounded-xl px-4 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="••••••••" />
                                 </div>
                                 
-                                <button type="submit" className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black hover:bg-indigo-600 transition-all shadow-lg active:scale-[0.98]">
+                                <button type="submit" className="w-full h-12 bg-slate-900 text-white rounded-xl font-black hover:bg-indigo-600 transition-all shadow-lg active:scale-[0.98] text-sm">
                                     {authMode === 'login' ? 'Access Dashboard' : 'Create Profile'}
                                 </button>
                                 
@@ -173,52 +193,52 @@
             }
 
             return (
-                <div className="max-w-7xl mx-auto px-4 md:px-8 pb-32 pt-8">
-                    <header className="flex justify-between items-center mb-10">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg text-white">
-                                <Icons.Logo size={24} />
+                <div className="max-w-7xl mx-auto px-4 md:px-8 pb-36 pt-6 min-h-screen">
+                    <header className="flex justify-between items-center mb-8">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg text-white shrink-0">
+                                <Icons.Logo size={20} />
                             </div>
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-900 leading-none">Hi, {user}</h2>
-                                <p className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1">Status: Protected</p>
+                            <div className="min-w-0">
+                                <h2 className="text-xl font-black text-slate-900 leading-none truncate">Hi, {user}</h2>
+                                <p className="text-[8px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1 truncate">Status: Protected</p>
                             </div>
                         </div>
-                        <button onClick={() => {if(confirm("Logout?")) {localStorage.clear(); window.location.reload();}}} className="h-10 px-4 bg-white rounded-xl font-black text-[10px] text-slate-400 flex items-center gap-2 border border-slate-100 hover:text-rose-500 transition-all shadow-sm">
+                        <button onClick={() => {if(confirm("Logout?")) {localStorage.clear(); window.location.reload();}}} className="h-9 px-3 bg-white rounded-lg font-black text-[9px] text-slate-400 flex items-center gap-2 border border-slate-100 hover:text-rose-500 transition-all shadow-sm shrink-0">
                             <Icons.LogOut /> Logout
                         </button>
                     </header>
 
                     {activeTab === 'dashboard' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
-                            {/* Today's Section - Desktop Friendly Sidebar */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
+                            {/* Today's Section */}
                             <div className="lg:col-span-4 space-y-6">
-                                <div className="bg-indigo-600 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden h-fit ring-4 ring-indigo-50">
+                                <div className="bg-indigo-600 rounded-[2rem] p-6 text-white shadow-xl relative overflow-hidden h-fit ring-4 ring-indigo-50">
                                     <div className="absolute -right-6 -bottom-6 opacity-10 rotate-12">
-                                        <Icons.Logo size={180} />
+                                        <Icons.Logo size={140} />
                                     </div>
                                     <div className="relative z-10">
-                                        <div className="flex justify-between items-center mb-8">
-                                            <span className="text-[10px] bg-white/20 px-4 py-1.5 rounded-full font-black uppercase tracking-widest">Today's Routine</span>
+                                        <div className="flex justify-between items-center mb-6">
+                                            <span className="text-[9px] bg-white/20 px-3 py-1 rounded-full font-black uppercase tracking-widest">Today's Routine</span>
                                             <Icons.Calendar />
                                         </div>
-                                        <div className="space-y-4">
+                                        <div className="space-y-3">
                                             {(() => {
                                                 const today = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
                                                 const todaysIds = timetable[today] || [];
-                                                if (todaysIds.length === 0) return <p className="text-center py-10 text-xs font-bold opacity-60 italic">No classes today. Enjoy your day!</p>;
+                                                if (todaysIds.length === 0) return <p className="text-center py-6 text-xs font-bold opacity-60 italic">No classes today.</p>;
                                                 return todaysIds.map((subId, idx) => {
                                                     const sub = subjects.find(s => s.id === subId);
                                                     if (!sub) return null;
                                                     return (
-                                                        <div key={`${subId}-${idx}`} className="flex items-center justify-between p-5 bg-white/10 backdrop-blur-md rounded-[1.5rem] border border-white/10 hover:bg-white/20 transition-all group">
-                                                            <div className="max-w-[140px]">
+                                                        <div key={`${subId}-${idx}`} className="flex items-center justify-between p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 hover:bg-white/20 transition-all">
+                                                            <div className="min-w-0 pr-2">
                                                                 <p className="font-bold text-sm truncate">{sub.name}</p>
                                                                 <p className="text-[8px] opacity-60 uppercase font-black">Slot {idx+1}</p>
                                                             </div>
-                                                            <div className="flex gap-2">
-                                                                <button onClick={() => logAttendance(sub.id, 'present')} className="h-10 w-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all text-white"><Icons.Check/></button>
-                                                                <button onClick={() => logAttendance(sub.id, 'absent')} className="h-10 w-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all text-white"><Icons.X/></button>
+                                                            <div className="flex gap-1.5 shrink-0">
+                                                                <button onClick={() => logAttendance(sub.id, 'present')} className="h-9 w-9 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all text-white"><Icons.Check/></button>
+                                                                <button onClick={() => logAttendance(sub.id, 'absent')} className="h-9 w-9 bg-rose-500 rounded-lg flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all text-white"><Icons.X/></button>
                                                             </div>
                                                         </div>
                                                     );
@@ -229,57 +249,56 @@
                                 </div>
                             </div>
 
-                            {/* Main Subject Grid - PC Optimized */}
-                            <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6 h-fit">
+                            {/* Main Subject Grid */}
+                            <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit">
                                 {subjects.map(sub => {
                                     const stats = calculateStats(sub.logs, sub.target, sub.totalExpected);
                                     const isDanger = stats.percentage < sub.target;
                                     return (
-                                        <div key={sub.id} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 hover:shadow-xl transition-all group relative overflow-hidden ring-1 ring-slate-100 hover:ring-indigo-100">
-                                            <div className="flex justify-between items-start mb-6">
-                                                <div className="max-w-[70%]">
-                                                    <h4 className="text-xl font-black text-slate-800 truncate tracking-tight">{sub.name}</h4>
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Goal: {sub.target}%</span>
+                                        <div key={sub.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-lg transition-all relative overflow-hidden group">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="min-w-0 pr-2">
+                                                    <h4 className="text-lg font-black text-slate-800 truncate tracking-tight">{sub.name}</h4>
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Goal: {sub.target}%</span>
                                                 </div>
-                                                <div className={`text-3xl font-black tabular-nums ${isDanger ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                <div className={`text-2xl font-black tabular-nums shrink-0 ${isDanger ? 'text-rose-500' : 'text-emerald-500'}`}>
                                                     {stats.percentage.toFixed(0)}%
                                                 </div>
                                             </div>
-                                            <div className="h-3 w-full bg-slate-50 rounded-full mb-8 overflow-hidden shadow-inner">
+                                            <div className="h-2 w-full bg-slate-50 rounded-full mb-6 overflow-hidden">
                                                 <div className={`h-full rounded-full transition-all duration-1000 ${isDanger ? 'bg-rose-500' : 'bg-indigo-600'}`} style={{ width: `${Math.min(100, stats.percentage)}%` }} />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4 mb-8">
-                                                <div className={`p-4 rounded-2xl border text-center transition-colors ${isDanger ? 'bg-rose-50 border-rose-100 text-rose-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>
-                                                    <p className="text-[9px] font-black uppercase mb-1">{!isDanger ? 'Safe Bunks' : 'Attend Next'}</p>
-                                                    <p className="text-base font-black">{stats.isImpossible ? 'Limit Reached' : stats.safeToBunk > 0 ? `${stats.safeToBunk} more` : `${stats.needToAttend} sessions`}</p>
+                                            <div className="grid grid-cols-2 gap-3 mb-6">
+                                                <div className={`p-3 rounded-xl border text-center transition-colors ${isDanger ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>
+                                                    <p className="text-[8px] font-black uppercase mb-0.5">{!isDanger ? 'Safe Bunks' : 'Attend Next'}</p>
+                                                    <p className="text-sm font-black truncate">{stats.isImpossible ? 'Limit Hit' : stats.safeToBunk > 0 ? `${stats.safeToBunk} more` : `${stats.needToAttend} more`}</p>
                                                 </div>
-                                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center text-slate-700">
-                                                    <p className="text-[9px] font-black uppercase mb-1">Max Possible</p>
-                                                    <p className="text-base font-black">{stats.maxPossible.toFixed(1)}%</p>
+                                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center text-slate-700">
+                                                    <p className="text-[8px] font-black uppercase mb-0.5">Max Possible</p>
+                                                    <p className="text-sm font-black">{stats.maxPossible.toFixed(1)}%</p>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-3">
-                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('forecast'); }} className="flex-1 h-11 rounded-xl bg-slate-100 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2"><Icons.Calc /> Sandbox</button>
-                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('history'); }} className="flex-1 h-11 rounded-xl bg-slate-100 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2"><Icons.History /> History</button>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('forecast'); }} className="flex-1 h-10 rounded-lg bg-slate-50 text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-1.5"><Icons.Calc /> Sandbox</button>
+                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('history'); }} className="flex-1 h-10 rounded-lg bg-slate-50 text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-1.5"><Icons.History /> History</button>
                                             </div>
                                         </div>
                                     );
                                 })}
                                 {subjects.length === 0 && (
-                                    <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-white/50 cursor-pointer hover:border-indigo-300 transition-all" onClick={() => setActiveTab('subjects')}>
-                                        <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-4 text-slate-300">
-                                            <Icons.Subjects size={32} />
-                                        </div>
-                                        <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">Add your first course to begin</p>
+                                    <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 rounded-[2rem] bg-white/50 cursor-pointer hover:border-indigo-300 transition-all" onClick={() => setActiveTab('subjects')}>
+                                        <Icons.Subjects size={32} className="mx-auto mb-3 text-slate-300" />
+                                        <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest px-4">Add your first course to begin</p>
                                     </div>
                                 )}
                             </div>
                         </div>
                     )}
 
+                    {/* Additional Tabs Logic... */}
                     {activeTab === 'subjects' && (
-                        <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-500">
-                            <h3 className="text-3xl font-black text-slate-900">Course Management</h3>
+                        <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500">
+                            <h3 className="text-2xl font-black text-slate-900">Course Management</h3>
                             <form onSubmit={(e) => {
                                 e.preventDefault();
                                 const newSub = { 
@@ -291,70 +310,68 @@
                                 };
                                 setSubjects([...subjects, newSub]);
                                 e.target.reset();
-                            }} className="bg-white p-10 rounded-[2.5rem] shadow-xl space-y-6 border border-slate-100 ring-1 ring-slate-100">
-                                <div className="space-y-2">
-                                    <label className="text-[11px] font-black uppercase text-slate-400 ml-1">Course Name</label>
-                                    <input name="name" required className="w-full h-16 bg-slate-50 rounded-2xl px-6 font-bold outline-none border-2 border-transparent focus:border-indigo-100 transition-all" placeholder="e.g. Advanced Calculus" />
+                            }} className="bg-white p-6 rounded-[2rem] shadow-lg space-y-4 border border-slate-100">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Course Name</label>
+                                    <input name="name" required className="w-full h-12 bg-slate-50 rounded-xl px-4 font-bold outline-none border-2 border-transparent focus:border-indigo-100 transition-all" placeholder="e.g. Computer Graphics" />
                                 </div>
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black uppercase text-slate-400 ml-1">Goal %</label>
-                                        <input name="target" type="number" defaultValue="75" className="w-full h-16 bg-slate-50 rounded-2xl px-6 font-bold outline-none" />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Goal %</label>
+                                        <input name="target" type="number" defaultValue="75" className="w-full h-12 bg-slate-50 rounded-xl px-4 font-bold outline-none" />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black uppercase text-slate-400 ml-1">Total Classes</label>
-                                        <input name="cap" type="number" required className="w-full h-16 bg-slate-50 rounded-2xl px-6 font-bold outline-none" placeholder="Total in Sem" />
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Total Classes</label>
+                                        <input name="cap" type="number" required className="w-full h-12 bg-slate-50 rounded-xl px-4 font-bold outline-none" placeholder="Sem Cap" />
                                     </div>
                                 </div>
-                                <button className="w-full h-16 bg-indigo-600 text-white font-black rounded-2xl hover:bg-slate-900 transition-all shadow-xl text-lg">Add to Semester</button>
+                                <button className="w-full h-12 bg-indigo-600 text-white font-black rounded-xl hover:bg-slate-900 transition-all shadow-xl">Add Subject</button>
                             </form>
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 {subjects.map(s => (
-                                    <div key={s.id} className="bg-white p-6 rounded-[1.5rem] flex justify-between items-center border border-slate-100 shadow-sm">
-                                        <div className="flex items-center gap-5">
-                                            <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center font-black text-white text-lg">{s.name[0]}</div>
-                                            <div>
-                                                <p className="font-bold text-slate-800 text-lg">{s.name}</p>
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Target: {s.target}% • Cap: {s.totalExpected}</p>
+                                    <div key={s.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-slate-100 shadow-sm">
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center font-black text-white shrink-0">{s.name[0]}</div>
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-slate-800 text-sm truncate">{s.name}</p>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">Target: {s.target}% • Cap: {s.totalExpected}</p>
                                             </div>
                                         </div>
-                                        <button onClick={() => { if(confirm("Erase course?")) setSubjects(subjects.filter(x => x.id !== s.id)) }} className="text-slate-300 hover:text-rose-500 p-3 transition-colors">
-                                            <Icons.Trash size={20} />
-                                        </button>
+                                        <button onClick={() => { if(confirm("Erase course?")) setSubjects(subjects.filter(x => x.id !== s.id)) }} className="text-slate-300 hover:text-rose-500 p-2 shrink-0"><Icons.Trash size={18} /></button>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
 
+                    {}
                     {activeTab === 'forecast' && (
-                        <div className="max-w-xl mx-auto space-y-8 animate-in slide-in-from-right-8 duration-500">
-                            <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-3 text-[11px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all"><Icons.Back /> Return to Dashboard</button>
+                        <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-right-8 duration-500">
+                            <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all"><Icons.Back /> Return</button>
                             {(() => {
                                 const sub = subjects.find(s => s.id === selectedSubId);
-                                if (!sub) return <p className="text-center py-20 font-bold text-slate-400 italic">Select a course to use the sandbox.</p>;
+                                if (!sub) return <p className="text-center py-12 font-bold text-slate-400 italic text-sm">Select a course to plan.</p>;
                                 const stats = calculateStats(sub.logs, sub.target, sub.totalExpected);
                                 const vP = stats.present + simAttend;
                                 const vC = stats.conducted + simAttend + simSkip;
                                 const vPerc = vC === 0 ? 100 : (vP / vC) * 100;
                                 return (
-                                    <div className="space-y-8">
-                                        <div className={`p-12 rounded-[3rem] text-white text-center shadow-2xl transition-colors duration-700 relative overflow-hidden ${vPerc >= sub.target ? 'bg-slate-900' : 'bg-rose-600'}`}>
-                                            <Icons.Calc size={140} className="absolute -left-10 -bottom-10 opacity-10" />
-                                            <p className="text-[11px] font-black opacity-50 uppercase tracking-[0.2em]">Bunk Projections</p>
-                                            <h3 className="text-7xl font-black tabular-nums my-4 tracking-tighter">{vPerc.toFixed(1)}%</h3>
-                                            <p className="text-xs font-black uppercase tracking-widest bg-white/10 inline-block px-4 py-1.5 rounded-full">{vPerc >= sub.target ? 'Status: Safe Zone' : 'Status: Danger Zone'}</p>
+                                    <div className="space-y-6">
+                                        <div className={`p-10 rounded-[2.5rem] text-white text-center shadow-2xl transition-colors relative overflow-hidden ${vPerc >= sub.target ? 'bg-slate-900' : 'bg-rose-600'}`}>
+                                            <p className="text-[10px] font-black opacity-50 uppercase tracking-[0.2em]">Projection Sandbox</p>
+                                            <h3 className="text-6xl font-black tabular-nums my-4 tracking-tighter">{vPerc.toFixed(1)}%</h3>
+                                            <p className="text-[10px] font-black uppercase tracking-widest bg-white/10 px-4 py-1.5 rounded-full inline-block">{vPerc >= sub.target ? 'Status: Safe' : 'Status: Critical'}</p>
                                         </div>
-                                        <div className="bg-white p-10 rounded-[3rem] shadow-xl space-y-12 border border-slate-100 ring-1 ring-slate-50">
-                                            <div className="space-y-6">
-                                                <div className="flex justify-between items-end"><label className="text-[11px] font-black uppercase text-slate-400 tracking-widest">If I go to...</label><span className="text-xl font-black text-indigo-600">{simAttend} classes</span></div>
+                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl space-y-8 border border-slate-100">
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-end"><label className="text-[10px] font-black uppercase text-slate-400">If I attend...</label><span className="text-lg font-black text-indigo-600">{simAttend} classes</span></div>
                                                 <input type="range" min="0" max={stats.remainingSlots} value={simAttend} onChange={e => setSimAttend(parseInt(e.target.value))} />
                                             </div>
-                                            <div className="space-y-6">
-                                                <div className="flex justify-between items-end"><label className="text-[11px] font-black uppercase text-slate-400 tracking-widest">If I bunk...</label><span className="text-xl font-black text-rose-500">{simSkip} classes</span></div>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-end"><label className="text-[10px] font-black uppercase text-slate-400">If I bunk...</label><span className="text-lg font-black text-rose-500">{simSkip} classes</span></div>
                                                 <input type="range" min="0" max={Math.max(0, stats.remainingSlots - simAttend)} value={simSkip} onChange={e => setSimSkip(parseInt(e.target.value))} />
                                             </div>
-                                            <button onClick={() => {setSimAttend(0); setSimSkip(0);}} className="w-full text-[11px] font-black uppercase text-slate-300 hover:text-indigo-500 tracking-widest transition-colors">Reset Planning Sandbox</button>
+                                            <button onClick={() => {setSimAttend(0); setSimSkip(0);}} className="w-full text-[10px] font-black uppercase text-slate-300 hover:text-indigo-500 transition-colors">Reset Sandbox</button>
                                         </div>
                                     </div>
                                 );
@@ -362,39 +379,38 @@
                         </div>
                     )}
 
+                    {}
                     {activeTab === 'history' && (
-                        <div className="max-w-xl mx-auto space-y-8 animate-in slide-in-from-right-8 duration-500">
-                             <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-3 text-[11px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all"><Icons.Back /> Return to Dashboard</button>
+                        <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-right-8 duration-500">
+                             <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all"><Icons.Back /> Return</button>
                              {(() => {
                                 const sub = subjects.find(s => s.id === selectedSubId);
-                                if (!sub) return <p className="text-center py-20 font-bold text-slate-400 italic">Select a course to view logs.</p>;
+                                if (!sub) return <p className="text-center py-12 font-bold text-slate-400 italic text-sm">Select a course first.</p>;
                                 return (
-                                    <div className="space-y-6">
-                                        <div className="flex justify-between items-center px-4">
-                                            <h3 className="text-2xl font-black">{sub.name} History</h3>
-                                            <span className="text-[10px] font-black bg-indigo-100 text-indigo-600 px-4 py-1.5 rounded-full uppercase">{sub.logs.length} Entries</span>
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center px-2">
+                                            <h3 className="text-xl font-black truncate max-w-[200px]">{sub.name}</h3>
+                                            <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full shrink-0">{sub.logs.length} Logs</span>
                                         </div>
                                         <div className="space-y-3">
                                             {sub.logs.map(log => (
-                                                <div key={log.id} className="bg-white p-5 rounded-3xl flex justify-between items-center border border-slate-100 group shadow-sm">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className={`h-11 w-11 rounded-2xl flex items-center justify-center ${log.status === 'present' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                                                            {log.status === 'present' ? <Icons.Check /> : <Icons.X />}
+                                                <div key={log.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-slate-100 shadow-sm">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${log.status === 'present' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                                            {log.status === 'present' ? <Icons.Check size={14}/> : <Icons.X size={14}/>}
                                                         </div>
-                                                        <div>
-                                                            <p className="text-base font-bold text-slate-700">{new Date(log.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</p>
-                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{log.status}</p>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-bold text-slate-700 truncate">{new Date(log.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</p>
+                                                            <p className="text-[8px] font-black text-slate-400 uppercase">{log.status}</p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => {
-                                                            const nSubs = subjects.map(s => s.id === sub.id ? {...s, logs: s.logs.filter(l => l.id !== log.id)} : s);
-                                                            setSubjects(nSubs);
-                                                        }} className="p-3 text-slate-300 hover:text-rose-500 transition-colors"><Icons.Trash size={18} /></button>
-                                                    </div>
+                                                    <button onClick={() => {
+                                                        const nSubs = subjects.map(s => s.id === sub.id ? {...s, logs: s.logs.filter(l => l.id !== log.id)} : s);
+                                                        setSubjects(nSubs);
+                                                    }} className="p-2 text-slate-300 hover:text-rose-500 shrink-0"><Icons.Trash size={16} /></button>
                                                 </div>
                                             ))}
-                                            {sub.logs.length === 0 && <p className="text-center py-20 text-slate-400 font-bold italic">No attendance recorded yet.</p>}
+                                            {sub.logs.length === 0 && <p className="text-center py-12 text-slate-400 font-bold italic text-sm px-4">No records yet.</p>}
                                         </div>
                                     </div>
                                 );
@@ -403,13 +419,13 @@
                     )}
 
                     {activeTab === 'timetable' && (
-                        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
-                            <h3 className="text-3xl font-black text-slate-900">Weekly Schedule</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
+                            <h3 className="text-2xl font-black text-slate-900">Weekly Schedule</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {DAYS.map(day => (
-                                    <div key={day} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 space-y-4 shadow-sm ring-1 ring-slate-50">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <p className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{day}</p>
+                                    <div key={day} className="bg-white p-6 rounded-[2rem] border border-slate-100 space-y-3 shadow-sm">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{day}</p>
                                             <button onClick={() => {
                                                 const id = prompt("Select Course Number:\n" + subjects.map((s,i) => `${i+1}: ${s.name}`).join('\n'));
                                                 if(!id) return;
@@ -419,17 +435,17 @@
                                                     newTT[day] = [...(newTT[day] || []), sub.id];
                                                     setTimetable(newTT);
                                                 }
-                                            }} className="text-indigo-600 h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center hover:bg-indigo-100 transition-all font-bold text-xl">+</button>
+                                            }} className="text-indigo-600 h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center hover:bg-indigo-100 transition-all font-bold text-lg shrink-0">+</button>
                                         </div>
-                                        <div className="space-y-3">
+                                        <div className="space-y-2">
                                             {(timetable[day] || []).map((id, idx) => {
                                                 const sub = subjects.find(s => s.id === id);
                                                 return (
-                                                    <div key={idx} className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center text-sm font-bold text-slate-600 border border-slate-100">
-                                                        <span className="truncate max-w-[140px]">{sub?.name || 'Unknown'}</span>
+                                                    <div key={idx} className="bg-slate-50 p-3 rounded-xl flex justify-between items-center text-xs font-bold text-slate-600 border border-slate-100 min-w-0">
+                                                        <span className="truncate max-w-[80%]">{sub?.name || 'Deleted'}</span>
                                                         <button onClick={() => {
                                                             const n = {...timetable}; n[day].splice(idx,1); setTimetable(n);
-                                                        }} className="text-slate-300 hover:text-rose-500 transition-colors"><Icons.X size={18} /></button>
+                                                        }} className="text-slate-300 hover:text-rose-500 p-1 shrink-0"><Icons.X size={14} /></button>
                                                     </div>
                                                 );
                                             })}
@@ -440,20 +456,20 @@
                         </div>
                     )}
 
-                    {/* Navigation Bar - Floating High-Performance UI */}
-                    <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-[420px] bg-slate-900/95 backdrop-blur-2xl h-22 rounded-[3rem] shadow-2xl flex items-center justify-around px-6 border border-white/10 z-50">
-                        <button onClick={() => setActiveTab('dashboard')} className={`p-5 rounded-3xl transition-all ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/40 scale-110' : 'text-slate-500 hover:text-white'}`}>
+                    {}
+                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[400px] bg-slate-900/95 backdrop-blur-2xl h-18 rounded-[2.5rem] shadow-2xl flex items-center justify-around px-4 border border-white/10 z-50">
+                        <button onClick={() => setActiveTab('dashboard')} className={`p-4 rounded-2xl transition-all ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
                             <Icons.Dashboard />
                         </button>
-                        <button onClick={() => setActiveTab('subjects')} className={`p-5 rounded-3xl transition-all ${activeTab === 'subjects' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/40 scale-110' : 'text-slate-500 hover:text-white'}`}>
+                        <button onClick={() => setActiveTab('subjects')} className={`p-4 rounded-2xl transition-all ${activeTab === 'subjects' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
                             <Icons.Subjects />
                         </button>
-                        <button onClick={() => setActiveTab('timetable')} className={`p-5 rounded-3xl transition-all ${activeTab === 'timetable' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/40 scale-110' : 'text-slate-500 hover:text-white'}`}>
+                        <button onClick={() => setActiveTab('timetable')} className={`p-4 rounded-2xl transition-all ${activeTab === 'timetable' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
                             <Icons.Calendar />
                         </button>
-                        <div className="w-[1.5px] h-10 bg-white/10 mx-2" />
-                        <div className="p-1 cursor-pointer opacity-80 hover:opacity-100 transition-all text-white" onClick={() => setActiveTab('dashboard')}>
-                            <Icons.Logo size={32} />
+                        <div className="w-[1.5px] h-8 bg-white/10 mx-1" />
+                        <div className="p-1 cursor-pointer opacity-80 hover:opacity-100 transition-all text-white shrink-0" onClick={() => setActiveTab('dashboard')}>
+                            <Icons.Logo size={28} />
                         </div>
                     </nav>
                 </div>

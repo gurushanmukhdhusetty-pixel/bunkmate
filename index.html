@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BunkMate Pro | Attendance Shield</title>
+    <title>BunkMate Pro | Track Your Bunks</title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'><path d='M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z'/><path d='M9 12l2 2 4-4' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>">
     
-    <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -24,7 +23,7 @@
             overflow-x: hidden;
             width: 100%;
         }
-        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.5); }
+        .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.6); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
         input[type='range'] {
@@ -37,21 +36,18 @@
         }
         input[type='range']::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
             background: #4F46E5;
             cursor: pointer;
-            border: 3px solid white;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 4px solid white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        
         .modal-overlay {
             animation: fadeIn 0.2s ease-out;
             background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(6px);
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -60,97 +56,101 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
-
         const Icons = {
             Logo: ({ size = 24, className = "" }) => (
                 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="currentColor" fillOpacity="0.2"/>
-                    <path d="m9 12 2 2 4-4" />
+                    <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" fill="currentColor" fillOpacity="0.2"/>
+                    <path d="M9 12l2 2 4-4" />
                 </svg>
             ),
-            Dashboard: (props) => <svg {...props} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
-            Subjects: (props) => <svg {...props} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
-            Calendar: (props) => <svg {...props} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
-            Check: (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
-            X: (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-            Ban: (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>,
-            Trash: (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-            History: (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>,
-            Calc: (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/></svg>,
-            Back: (props) => <svg {...props} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
-            LogOut: (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
-            Alert: (props) => <svg {...props} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Dashboard: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+            Subjects: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
+            Calendar: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+            Check: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>,
+            X: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+            Ban: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>,
+            Trash: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+            Reschedule: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 0-9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/><path d="M12 7v5l2 2"/></svg>,
+            Flame: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.291 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>,
+            Back: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6"/></svg>,
+            Plus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         };
 
         const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
         const calculateStats = (logs, target, totalCap) => {
             const validLogs = logs.filter(l => l.status === 'present' || l.status === 'absent');
-            const present = validLogs.filter(l => l.status === 'present').length;
-            const absent = validLogs.filter(l => l.status === 'absent').length;
-            const canceled = logs.filter(l => l.status === 'canceled').length;
+            const present = logs.filter(l => l.status === 'present').length;
+            const absent = logs.filter(l => l.status === 'absent').length;
+            const nonMathLogs = logs.filter(l => l.status === 'canceled' || l.status === 'rescheduled').length;
             
             const conducted = present + absent;
-            const slotsUsed = conducted + canceled;
+            const slotsUsed = conducted + nonMathLogs;
             
             const percentage = conducted === 0 ? 100 : (present / conducted) * 100;
             const remainingSlots = Math.max(0, totalCap - slotsUsed);
-            const maxPossible = totalCap === 0 ? 0 : ((present + remainingSlots) / (totalCap - canceled)) * 100;
+            const maxPossible = totalCap === 0 ? 0 : ((present + remainingSlots) / (totalCap - nonMathLogs)) * 100;
             
             const targetDec = target / 100;
             let safeToBunk = 0;
             let needToAttend = 0;
 
             if (percentage >= target) {
-                // How many more skips (X) until we hit target: P / (C + X) >= T
                 safeToBunk = Math.floor(present / targetDec - conducted);
                 safeToBunk = Math.max(0, Math.min(safeToBunk, remainingSlots));
             } else {
-                // How many in a row (Y) to reach target: (P + Y) / (C + Y) >= T
                 needToAttend = Math.ceil((targetDec * conducted - present) / (1 - targetDec));
+            }
+
+            let streak = 0;
+            const sortedLogs = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+            for (let log of sortedLogs) {
+                if (log.status === 'present') streak++;
+                else if (log.status === 'absent') break;
             }
 
             return { 
                 percentage, safeToBunk, needToAttend, conducted, 
                 remainingSlots, maxPossible, isImpossible: maxPossible < target,
-                present, absent, canceled
+                present, absent, slotsUsed, streak
             };
         };
 
+        const { useState, useEffect, useMemo } = React;
+
         function App() {
-            const [user, setUser] = useState(() => localStorage.getItem('bm_pro_user'));
+            const [user, setUser] = useState(() => localStorage.getItem('bm_pro_v12_user'));
             const [authMode, setAuthMode] = useState(user ? 'none' : 'login');
             const [activeTab, setActiveTab] = useState('dashboard');
-            const [subjects, setSubjects] = useState(() => JSON.parse(localStorage.getItem('bm_pro_subs')) || []);
-            const [timetable, setTimetable] = useState(() => JSON.parse(localStorage.getItem('bm_pro_tt')) || { 
+            const [subjects, setSubjects] = useState(() => JSON.parse(localStorage.getItem('bm_pro_v12_subs')) || []);
+            const [timetable, setTimetable] = useState(() => JSON.parse(localStorage.getItem('bm_pro_v12_tt')) || { 
                 Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] 
             });
+            
             const [selectedSubId, setSelectedSubId] = useState(null);
             const [modal, setModal] = useState({ isOpen: false, type: null, data: null });
-            
             const [simAttend, setSimAttend] = useState(0);
             const [simSkip, setSimSkip] = useState(0);
 
             useEffect(() => {
-                localStorage.setItem('bm_pro_subs', JSON.stringify(subjects));
-                localStorage.setItem('bm_pro_tt', JSON.stringify(timetable));
+                localStorage.setItem('bm_pro_v12_subs', JSON.stringify(subjects));
+                localStorage.setItem('bm_pro_v12_tt', JSON.stringify(timetable));
             }, [subjects, timetable]);
 
-            const closeSubModal = () => setModal({ isOpen: false, type: null, data: null });
+            const closeUIModal = () => setModal({ isOpen: false, type: null, data: null });
 
             const logAttendance = (id, status, isExtra = false, countsInCap = true) => {
                 const sub = subjects.find(s => s.id === id);
-                const today = new Date().toISOString().split('T')[0];
-                const alreadyLoggedToday = sub.logs.some(l => l.date.startsWith(today));
+                if (!sub) return;
 
-                // Duplicate check
-                if (alreadyLoggedToday && !isExtra) {
-                    setModal({ 
-                        isOpen: true, 
-                        type: 'EXTRA_CLASS_CHECK', 
-                        data: { id, status, subName: sub.name } 
-                    });
+                const today = new Date().toISOString().split('T')[0];
+                const todaysLogsForSub = sub.logs.filter(l => l.date.startsWith(today)).length;
+                const dayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+                const scheduledToday = timetable[dayName].filter(sid => sid === id).length;
+
+                // Extra class check
+                if (!isExtra && todaysLogsForSub >= Math.max(1, scheduledToday)) {
+                    setModal({ isOpen: true, type: 'EXTRA_CLASS_CHECK', data: { id, status, subName: sub.name } });
                     return;
                 }
 
@@ -160,46 +160,57 @@
                         return { 
                             ...s, 
                             totalExpected: newCap,
-                            logs: [{ id: Date.now(), status, date: new Date().toISOString(), isExtra }, ...s.logs] 
+                            logs: [{ id: Date.now() + Math.random(), status, date: new Date().toISOString(), isExtra }, ...s.logs] 
                         };
                     }
                     return s;
                 }));
-                closeSubModal();
+                closeUIModal();
             };
+
+            const dayAnalysis = useMemo(() => {
+                const todayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+                const todaysRoutine = timetable[todayName] || [];
+                if (todaysRoutine.length === 0) return { isSafeToBunkAll: true, scheduled: 0 };
+
+                let allSafe = true;
+                const subjectGroups = todaysRoutine.reduce((acc, sid) => { acc[sid] = (acc[sid] || 0) + 1; return acc; }, {});
+
+                Object.entries(subjectGroups).forEach(([sid, count]) => {
+                    const sub = subjects.find(s => s.id === sid);
+                    if (!sub) return;
+                    const simLogs = [...sub.logs];
+                    for(let i=0; i<count; i++) simLogs.push({ status: 'absent' });
+                    const simStats = calculateStats(simLogs, sub.target, sub.totalExpected);
+                    if (simStats.percentage < sub.target) allSafe = false;
+                });
+
+                return { isSafeToBunkAll: allSafe, scheduled: todaysRoutine.length };
+            }, [subjects, timetable]);
 
             if (authMode !== 'none') {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
-                        <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-500">
-                            <div className="bg-slate-900 p-8 text-center text-white relative">
-                                <div className="mx-auto w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-xl animate-float">
-                                    <Icons.Logo size={28} className="text-white" />
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+                        <div className="w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
+                            <div className="bg-slate-900 p-10 text-center text-white relative">
+                                <div className="mx-auto w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-xl">
+                                    <Icons.Logo size={32} />
                                 </div>
-                                <h1 className="text-2xl font-black tracking-tight">BunkMate Pro</h1>
-                                <p className="text-indigo-400 text-[9px] uppercase font-black tracking-[0.2em] mt-1">Attendance Protection System</p>
+                                <h1 className="text-3xl font-black tracking-tight">BunkMate Pro</h1>
+                                <p className="text-indigo-400 text-[10px] uppercase font-black tracking-widest mt-2">Track Your Bunks</p>
                             </div>
-                            
                             <form onSubmit={(e) => {
                                 e.preventDefault();
                                 const name = e.target.username.value;
                                 setUser(name);
-                                localStorage.setItem('bm_pro_user', name);
+                                localStorage.setItem('bm_pro_v12_user', name);
                                 setAuthMode('none');
-                            }} className="p-8 space-y-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Username</label>
-                                    <input name="username" required className="w-full h-12 bg-slate-100 rounded-xl px-4 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="Enter unique ID" />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Access Key</label>
-                                    <input name="password" type="password" required className="w-full h-12 bg-slate-100 rounded-xl px-4 font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="••••••••" />
-                                </div>
-                                <button type="submit" className="w-full h-12 bg-slate-900 text-white rounded-xl font-black hover:bg-indigo-600 transition-all shadow-lg active:scale-[0.98] text-sm">
-                                    {authMode === 'login' ? 'Access Dashboard' : 'Create Profile'}
-                                </button>
-                                <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 pt-2">
-                                    {authMode === 'login' ? "New student? Sign Up" : "Registered user? Sign In"}
+                            }} className="p-8 space-y-5">
+                                <input name="username" required className="w-full h-14 bg-slate-100 rounded-2xl px-5 font-bold outline-none" placeholder="Username" />
+                                <input name="password" type="password" required className="w-full h-14 bg-slate-100 rounded-2xl px-5 font-bold outline-none" placeholder="Password" />
+                                <button type="submit" className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black hover:bg-indigo-600 transition-all shadow-xl">Access Account</button>
+                                <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pt-2">
+                                    {authMode === 'login' ? "New Student? Create Profile" : "Existing Member? Login"}
                                 </button>
                             </form>
                         </div>
@@ -208,100 +219,107 @@
             }
 
             return (
-                <div className="max-w-7xl mx-auto px-4 md:px-8 pb-40 pt-6 min-h-screen overflow-x-hidden">
-                    {}
-                    <header className="flex justify-between items-center mb-8">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg text-white shrink-0">
-                                <Icons.Logo size={20} />
-                            </div>
-                            <div className="min-w-0">
-                                <h2 className="text-xl font-black text-slate-900 leading-none truncate">Hi, {user}</h2>
-                                <p className="text-[8px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1 truncate">Status: Active Protection</p>
+                <div className="max-w-7xl mx-auto px-5 md:px-10 pb-40 pt-8 min-h-screen overflow-x-hidden">
+                    <header className="flex justify-between items-center mb-10">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg text-white"><Icons.Logo size={24} /></div>
+                            <div>
+                                <h2 className="text-2xl font-black text-slate-900 leading-none">BunkMate Pro</h2>
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mt-1">Track Your Bunks • {user}</p>
                             </div>
                         </div>
-                        <button onClick={() => setModal({ isOpen: true, type: 'LOGOUT_CHECK' })} className="h-9 px-3 bg-white rounded-lg font-black text-[9px] text-slate-400 flex items-center gap-2 border border-slate-100 hover:text-rose-500 transition-all shadow-sm shrink-0">
-                            <Icons.LogOut /> Logout
+                        <button onClick={() => setModal({ isOpen: true, type: 'SETTINGS' })} className="h-10 w-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 hover:text-indigo-600">
+                           <Icons.Dashboard />
                         </button>
                     </header>
 
                     {}
                     {activeTab === 'dashboard' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-500">
-                            <div className="lg:col-span-4 space-y-6">
-                                <div className="bg-indigo-600 rounded-[2rem] p-6 text-white shadow-xl relative overflow-hidden h-fit ring-4 ring-indigo-50">
-                                    <div className="absolute -right-6 -bottom-6 opacity-10 rotate-12"><Icons.Logo size={140} /></div>
-                                    <div className="relative z-10">
-                                        <div className="flex justify-between items-center mb-6">
-                                            <span className="text-[9px] bg-white/20 px-3 py-1 rounded-full font-black uppercase tracking-widest">Today's Routine</span>
-                                            <Icons.Calendar />
-                                        </div>
-                                        <div className="space-y-3">
-                                            {(() => {
-                                                const today = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
-                                                const todaysIds = timetable[today] || [];
-                                                if (todaysIds.length === 0) return <p className="text-center py-6 text-xs font-bold opacity-60 italic">No classes today.</p>;
-                                                return todaysIds.map((subId, idx) => {
-                                                    const sub = subjects.find(s => s.id === subId);
-                                                    if (!sub) return null;
-                                                    return (
-                                                        <div key={`${subId}-${idx}`} className="flex flex-col gap-3 p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 hover:bg-white/20 transition-all">
-                                                            <div className="min-w-0">
-                                                                <p className="font-bold text-sm truncate">{sub.name}</p>
-                                                            </div>
-                                                            <div className="flex gap-2 shrink-0">
-                                                                <button onClick={() => logAttendance(sub.id, 'present')} className="flex-1 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all text-white"><Icons.Check/></button>
-                                                                <button onClick={() => logAttendance(sub.id, 'absent')} className="flex-1 h-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all text-white"><Icons.X/></button>
-                                                                <button title="Mark Canceled" onClick={() => logAttendance(sub.id, 'canceled')} className="flex-1 h-10 bg-slate-700/50 rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all text-white"><Icons.Ban/></button>
-                                                            </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
+                            <div className="lg:col-span-4 space-y-6 min-w-0">
+                                <div className={`rounded-[2.5rem] p-6 text-white shadow-lg relative overflow-hidden transition-all duration-500 ${dayAnalysis.scheduled === 0 ? 'bg-slate-800' : dayAnalysis.isSafeToBunkAll ? 'bg-indigo-600' : 'bg-rose-600'}`}>
+                                    <div className="relative z-10 space-y-1">
+                                        <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Daily Impact</p>
+                                        <h4 className="text-xl font-black">{dayAnalysis.scheduled === 0 ? "Rest Day" : dayAnalysis.isSafeToBunkAll ? "Safe to Bunk Today" : "Attendance Critical"}</h4>
+                                        <p className="text-[11px] font-medium opacity-80 leading-snug">
+                                            {dayAnalysis.scheduled === 0 ? "Enjoy your classes-free day." : dayAnalysis.isSafeToBunkAll ? "Skips today won't drop you below your goal." : "You'll hit the danger zone if you miss all sessions."}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 h-fit">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <span className="text-[10px] bg-slate-50 px-4 py-1.5 rounded-full font-black uppercase tracking-widest">Today's Schedule</span>
+                                        <Icons.Calendar className="text-slate-300" />
+                                    </div>
+                                    <div className="space-y-4">
+                                        {(() => {
+                                            const todayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+                                            const todaysRoutine = timetable[todayName] || [];
+                                            if (todaysRoutine.length === 0) return <p className="text-center py-10 text-xs font-bold text-slate-300 italic">No classes today.</p>;
+                                            return todaysRoutine.map((subId, idx) => {
+                                                const sub = subjects.find(s => s.id === subId);
+                                                if (!sub) return null;
+                                                return (
+                                                    <div key={`${subId}-${idx}`} className="p-5 bg-slate-50 rounded-3xl border border-slate-100 hover:shadow-md transition-all">
+                                                        <div className="flex justify-between items-center mb-3 min-w-0">
+                                                            <p className="font-bold text-sm text-slate-800 truncate pr-2">{sub.name}</p>
+                                                            <span className="text-[9px] font-black text-slate-300 uppercase shrink-0">Slot {idx+1}</span>
                                                         </div>
-                                                    );
-                                                });
-                                            })()}
-                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => logAttendance(sub.id, 'present')} className="flex-1 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white"><Icons.Check/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'absent')} className="flex-1 h-12 bg-rose-500 rounded-2xl flex items-center justify-center text-white"><Icons.X/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'rescheduled')} className="flex-1 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-white"><Icons.Reschedule/></button>
+                                                            <button onClick={() => logAttendance(sub.id, 'canceled')} className="flex-1 h-12 bg-slate-300 rounded-2xl flex items-center justify-center text-slate-600"><Icons.Ban/></button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit">
+                            <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-5 h-fit">
                                 {subjects.map(sub => {
                                     const stats = calculateStats(sub.logs, sub.target, sub.totalExpected);
                                     const isDanger = stats.percentage < sub.target;
                                     return (
-                                        <div key={sub.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-lg transition-all relative overflow-hidden group">
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div className="min-w-0 pr-2">
-                                                    <h4 className="text-lg font-black text-slate-800 truncate tracking-tight">{sub.name}</h4>
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Goal: {sub.target}%</span>
+                                        <div key={sub.id} className="bg-white rounded-[2.5rem] p-7 shadow-sm border border-slate-100 hover:shadow-xl transition-all relative overflow-hidden group">
+                                            <div className="flex justify-between items-start mb-6">
+                                                <div className="min-w-0 pr-4">
+                                                    <h4 className="text-xl font-black text-slate-800 truncate tracking-tight">{sub.name}</h4>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase">Goal: {sub.target}%</span>
+                                                        {stats.streak >= 3 && <div className="flex items-center gap-1 bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase shrink-0"><Icons.Flame /> {stats.streak} Streak</div>}
+                                                    </div>
                                                 </div>
-                                                <div className={`text-2xl font-black tabular-nums shrink-0 ${isDanger ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                                    {stats.percentage.toFixed(0)}%
-                                                </div>
+                                                <div className={`text-3xl font-black tabular-nums shrink-0 ${isDanger ? 'text-rose-500' : 'text-emerald-500'}`}>{stats.percentage.toFixed(0)}%</div>
                                             </div>
-                                            <div className="h-2 w-full bg-slate-50 rounded-full mb-6 overflow-hidden">
+                                            <div className="h-3 w-full bg-slate-50 rounded-full mb-8 overflow-hidden">
                                                 <div className={`h-full rounded-full transition-all duration-1000 ${isDanger ? 'bg-rose-500' : 'bg-indigo-600'}`} style={{ width: `${Math.min(100, stats.percentage)}%` }} />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3 mb-6">
-                                                <div className={`p-3 rounded-xl border text-center transition-colors ${isDanger ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>
-                                                    <p className="text-[8px] font-black uppercase mb-0.5">{!isDanger ? 'Safe to Bunk' : 'Attend Next'}</p>
-                                                    <p className="text-sm font-black truncate">{stats.isImpossible ? 'Limit Hit' : stats.safeToBunk > 0 ? `${stats.safeToBunk} more` : `${stats.needToAttend} more`}</p>
+                                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                                <div className={`p-4 rounded-2xl border text-center ${isDanger ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>
+                                                    <p className="text-[9px] font-black uppercase mb-1">{!isDanger ? 'Bunks Left' : 'Must Attend'}</p>
+                                                    <p className="text-base font-black truncate">{stats.isImpossible ? 'Limit Hit' : stats.safeToBunk > 0 ? `${stats.safeToBunk} Sessions` : `${stats.needToAttend} More`}</p>
                                                 </div>
-                                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center text-slate-700">
-                                                    <p className="text-[8px] font-black uppercase mb-0.5">Remaining</p>
-                                                    <p className="text-sm font-black">{stats.remainingSlots} Slots</p>
+                                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center text-slate-700">
+                                                    <p className="text-[9px] font-black uppercase mb-1">Cap Left</p>
+                                                    <p className="text-base font-black truncate">{stats.remainingSlots} Slots</p>
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('forecast'); }} className="flex-1 h-10 rounded-lg bg-slate-50 text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-1.5"><Icons.Calc /> Sandbox</button>
-                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('history'); }} className="flex-1 h-10 rounded-lg bg-slate-50 text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-1.5"><Icons.History /> Logs</button>
+                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('forecast'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all">Simulator</button>
+                                                <button onClick={() => { setSelectedSubId(sub.id); setActiveTab('history'); }} className="flex-1 h-12 rounded-xl bg-slate-50 text-[10px] font-black uppercase text-slate-500 hover:bg-indigo-600 hover:text-white transition-all">History</button>
                                             </div>
                                         </div>
                                     );
                                 })}
                                 {subjects.length === 0 && (
-                                    <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 rounded-[2rem] bg-white/50 cursor-pointer hover:border-indigo-300 transition-all" onClick={() => setActiveTab('subjects')}>
-                                        <Icons.Subjects size={32} className="mx-auto mb-3 text-slate-300" />
-                                        <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest px-4">Add your first course to begin</p>
+                                    <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-[3rem] bg-white/50 cursor-pointer" onClick={() => setActiveTab('subjects')}>
+                                        <Icons.Subjects size={40} className="mx-auto mb-4 text-slate-300" />
+                                        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest px-6">Add your first course to begin</p>
                                     </div>
                                 )}
                             </div>
@@ -310,47 +328,44 @@
 
                     {}
                     {activeTab === 'subjects' && (
-                        <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500">
-                            <h3 className="text-2xl font-black text-slate-900">Course Management</h3>
+                        <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-500">
+                            <h3 className="text-3xl font-black text-slate-900 tracking-tight">Manage Courses</h3>
                             <form onSubmit={(e) => {
                                 e.preventDefault();
-                                const newSub = { 
-                                    id: Date.now(), 
-                                    name: e.target.name.value, 
-                                    target: parseInt(e.target.target.value), 
-                                    totalExpected: parseInt(e.target.cap.value), 
-                                    logs: [] 
-                                };
+                                const newSub = { id: Date.now(), name: e.target.name.value, target: parseInt(e.target.target.value), totalExpected: parseInt(e.target.cap.value), logs: [] };
                                 setSubjects([...subjects, newSub]);
                                 e.target.reset();
-                            }} className="bg-white p-6 rounded-[2rem] shadow-lg space-y-4 border border-slate-100">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Course Name</label>
-                                    <input name="name" required className="w-full h-12 bg-slate-50 rounded-xl px-4 font-bold outline-none border-2 border-transparent focus:border-indigo-100 transition-all" placeholder="e.g. Operating Systems" />
+                            }} className="bg-white p-8 rounded-[3rem] shadow-xl space-y-6 border border-slate-100">
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-black uppercase text-slate-400 ml-1">Course Name</label>
+                                    <input name="name" required className="w-full h-14 bg-slate-50 rounded-2xl px-5 font-bold outline-none" placeholder="e.g. Algorithms" />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Goal %</label>
-                                        <input name="target" type="number" defaultValue="75" className="w-full h-12 bg-slate-50 rounded-xl px-4 font-bold outline-none" />
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div className="space-y-2">
+                                        <label className="text-[11px] font-black uppercase text-slate-400 ml-1">Your Goal %</label>
+                                        <input name="target" type="number" defaultValue="75" className="w-full h-14 bg-slate-50 rounded-2xl px-5 font-bold outline-none" />
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Total Slots</label>
-                                        <input name="cap" type="number" required className="w-full h-12 bg-slate-50 rounded-xl px-4 font-bold outline-none" placeholder="Sem Cap" />
+                                    <div className="space-y-2">
+                                        <label className="text-[11px] font-black uppercase text-slate-400 ml-1">Semester Cap</label>
+                                        <input name="cap" type="number" required className="w-full h-14 bg-slate-50 rounded-2xl px-5 font-bold outline-none" placeholder="Total" />
                                     </div>
                                 </div>
-                                <button className="w-full h-12 bg-indigo-600 text-white font-black rounded-xl hover:bg-slate-900 transition-all shadow-xl">Add Subject</button>
+                                <button className="w-full h-14 bg-indigo-600 text-white font-black rounded-2xl hover:bg-slate-900 transition-all shadow-xl">Create Course</button>
                             </form>
-                            <div className="space-y-3">
+                            <div className="space-y-4 pb-20">
                                 {subjects.map(s => (
-                                    <div key={s.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-slate-100 shadow-sm">
-                                        <div className="flex items-center gap-4 min-w-0">
-                                            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center font-black text-white shrink-0">{s.name[0]}</div>
-                                            <div className="min-w-0">
-                                                <p className="font-bold text-slate-800 text-sm truncate">{s.name}</p>
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">Goal: {s.target}% • Cap: {s.totalExpected}</p>
+                                    <div key={s.id} className="bg-white p-5 rounded-3xl flex justify-between items-center border border-slate-100 shadow-sm">
+                                        <div className="flex items-center gap-5 truncate">
+                                            <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center font-black text-white shrink-0">{s.name[0]}</div>
+                                            <div className="truncate">
+                                                <p className="font-bold text-slate-800 truncate">{s.name}</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Goal: {s.target}% • Cap: {s.totalExpected}</p>
                                             </div>
                                         </div>
-                                        <button onClick={() => setModal({ isOpen: true, type: 'DELETE_SUBJECT', data: s })} className="text-slate-300 hover:text-rose-500 p-2 shrink-0"><Icons.Trash size={18} /></button>
+                                        <div className="flex gap-2 shrink-0">
+                                            <button onClick={() => setModal({ isOpen: true, type: 'EDIT_SUBJECT', data: s })} className="text-slate-300 hover:text-indigo-600 p-3"><Icons.Reschedule size={18}/></button>
+                                            <button onClick={() => setModal({ isOpen: true, type: 'DELETE_SUBJECT', data: s })} className="text-slate-300 hover:text-rose-500 p-3"><Icons.Trash /></button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -359,27 +374,28 @@
 
                     {}
                     {activeTab === 'timetable' && (
-                        <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
-                            <h3 className="text-2xl font-black text-slate-900">Weekly Routine</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+                            <h3 className="text-3xl font-black text-slate-900 tracking-tight">Weekly Routine</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                                 {DAYS.map(day => (
-                                    <div key={day} className="bg-white p-6 rounded-[2rem] border border-slate-100 space-y-3 shadow-sm">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{day}</p>
-                                            <button onClick={() => setModal({ isOpen: true, type: 'ADD_TO_TIMETABLE', data: day })} className="text-indigo-600 h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center hover:bg-indigo-100 transition-all font-bold text-lg shrink-0">+</button>
+                                    <div key={day} className="bg-white p-8 rounded-[3rem] border border-slate-100 space-y-4 shadow-sm h-fit">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <p className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{day}</p>
+                                            <button onClick={() => setModal({ isOpen: true, type: 'ADD_TO_TIMETABLE', data: day })} className="text-indigo-600 h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center hover:bg-indigo-100 transition-all font-bold text-xl">+</button>
                                         </div>
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                             {(timetable[day] || []).map((id, idx) => {
                                                 const sub = subjects.find(s => s.id === id);
                                                 return (
-                                                    <div key={idx} className="bg-slate-50 p-3 rounded-xl flex justify-between items-center text-xs font-bold text-slate-600 border border-slate-100 min-w-0">
-                                                        <span className="truncate max-w-[80%]">{sub?.name || 'Deleted'}</span>
+                                                    <div key={idx} className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center text-xs font-bold text-slate-600 border border-slate-100 group">
+                                                        <span className="truncate pr-4">{sub?.name || 'Deleted'}</span>
                                                         <button onClick={() => {
                                                             const n = {...timetable}; n[day].splice(idx,1); setTimetable(n);
-                                                        }} className="text-slate-300 hover:text-rose-500 p-1 shrink-0"><Icons.X size={14} /></button>
+                                                        }} className="text-slate-300 hover:text-rose-500 p-1.5 opacity-0 group-hover:opacity-100 transition-all shrink-0"><Icons.X /></button>
                                                     </div>
                                                 );
                                             })}
+                                            {(timetable[day] || []).length === 0 && <p className="text-center py-4 text-[10px] font-bold text-slate-300 italic">No classes scheduled.</p>}
                                         </div>
                                     </div>
                                 ))}
@@ -389,32 +405,32 @@
 
                     {}
                     {activeTab === 'forecast' && (
-                        <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-right-8 duration-500">
-                            <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all"><Icons.Back /> Return</button>
+                        <div className="max-w-md mx-auto space-y-8 animate-in slide-in-from-right-10 duration-500 pb-20">
+                            <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-3 text-[11px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all"><Icons.Back /> Dashboard</button>
                             {(() => {
                                 const sub = subjects.find(s => s.id === selectedSubId);
-                                if (!sub) return <p className="text-center py-12 font-bold text-slate-400 italic text-sm">Select a course first.</p>;
+                                if (!sub) return null;
                                 const stats = calculateStats(sub.logs, sub.target, sub.totalExpected);
                                 const vP = stats.present + simAttend;
                                 const vC = stats.conducted + simAttend + simSkip;
                                 const vPerc = vC === 0 ? 100 : (vP / vC) * 100;
                                 return (
-                                    <div className="space-y-6">
-                                        <div className={`p-10 rounded-[2.5rem] text-white text-center shadow-2xl transition-colors relative overflow-hidden ${vPerc >= sub.target ? 'bg-slate-900' : 'bg-rose-600'}`}>
-                                            <p className="text-[10px] font-black opacity-50 uppercase tracking-[0.2em]">Bunks Simulator</p>
-                                            <h3 className="text-6xl font-black tabular-nums my-4 tracking-tighter">{vPerc.toFixed(1)}%</h3>
-                                            <p className="text-[10px] font-black uppercase tracking-widest bg-white/10 px-4 py-1.5 rounded-full inline-block">{vPerc >= sub.target ? 'Status: Safe' : 'Status: Critical'}</p>
+                                    <div className="space-y-8">
+                                        <div className={`p-10 rounded-[3.5rem] text-white text-center shadow-2xl transition-colors duration-500 ${vPerc >= sub.target ? 'bg-slate-900' : 'bg-rose-600'}`}>
+                                            <p className="text-[11px] font-black opacity-60 uppercase tracking-widest">Projected Attendance</p>
+                                            <h3 className="text-7xl font-black tabular-nums my-6">{vPerc.toFixed(1)}%</h3>
+                                            <div className="text-[11px] font-black uppercase tracking-widest bg-white/15 px-6 py-2 rounded-full inline-block">Goal: {sub.target}%</div>
                                         </div>
-                                        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl space-y-8 border border-slate-100">
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-end"><label className="text-[10px] font-black uppercase text-slate-400">If I attend...</label><span className="text-lg font-black text-indigo-600">{simAttend} classes</span></div>
+                                        <div className="bg-white p-10 rounded-[3.5rem] shadow-xl space-y-10 border border-slate-100">
+                                            <div className="space-y-5">
+                                                <div className="flex justify-between items-end"><label className="text-[11px] font-black uppercase text-slate-400">If I attend...</label><span className="text-xl font-black text-indigo-600">{simAttend} classes</span></div>
                                                 <input type="range" min="0" max={stats.remainingSlots} value={simAttend} onChange={e => setSimAttend(parseInt(e.target.value))} />
                                             </div>
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-end"><label className="text-[10px] font-black uppercase text-slate-400">If I bunk...</label><span className="text-lg font-black text-rose-500">{simSkip} classes</span></div>
+                                            <div className="space-y-5">
+                                                <div className="flex justify-between items-end"><label className="text-[11px] font-black uppercase text-slate-400">If I bunk...</label><span className="text-xl font-black text-rose-500">{simSkip} classes</span></div>
                                                 <input type="range" min="0" max={Math.max(0, stats.remainingSlots - simAttend)} value={simSkip} onChange={e => setSimSkip(parseInt(e.target.value))} />
                                             </div>
-                                            <button onClick={() => {setSimAttend(0); setSimSkip(0);}} className="w-full text-[10px] font-black uppercase text-slate-300 hover:text-indigo-500 transition-colors">Reset Simulation</button>
+                                            <button onClick={() => {setSimAttend(0); setSimSkip(0);}} className="w-full text-[11px] font-black uppercase text-slate-300 hover:text-indigo-500 transition-colors">Reset Sandbox</button>
                                         </div>
                                     </div>
                                 );
@@ -424,46 +440,40 @@
 
                     {}
                     {activeTab === 'history' && (
-                        <div className="max-w-md mx-auto space-y-6 animate-in slide-in-from-right-8 duration-500">
-                             <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all"><Icons.Back /> Return</button>
+                        <div className="max-w-xl mx-auto space-y-8 animate-in slide-in-from-right-10 duration-500 pb-20">
+                             <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-3 text-[11px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all"><Icons.Back /> Dashboard</button>
                              {(() => {
                                 const sub = subjects.find(s => s.id === selectedSubId);
-                                if (!sub) return <p className="text-center py-12 font-bold text-slate-400 italic text-sm">Select a course to view logs.</p>;
+                                if (!sub) return null;
                                 return (
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center px-2">
-                                            <h3 className="text-xl font-black truncate max-w-[200px]">{sub.name}</h3>
-                                            <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full shrink-0">{sub.logs.length} Logs</span>
+                                    <div className="space-y-5">
+                                        <div className="flex justify-between items-center px-4">
+                                            <h3 className="text-2xl font-black truncate max-w-[70%]">{sub.name}</h3>
+                                            <span className="text-[10px] font-black bg-indigo-100 text-indigo-600 px-4 py-1.5 rounded-full uppercase tracking-widest">{sub.logs.length} Logs</span>
                                         </div>
-                                        <div className="space-y-3">
+                                        <div className="space-y-4">
                                             {sub.logs.map(log => (
-                                                <div key={log.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-slate-100 shadow-sm">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${log.status === 'present' ? 'bg-emerald-100 text-emerald-600' : log.status === 'absent' ? 'bg-rose-100 text-rose-600' : 'bg-slate-200 text-slate-500'}`}>
-                                                            {log.status === 'present' ? <Icons.Check size={14}/> : log.status === 'absent' ? <Icons.X size={14}/> : <Icons.Ban size={14}/>}
+                                                <div key={log.id} className="bg-white p-5 rounded-[2rem] flex justify-between items-center border border-slate-100 shadow-sm group">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${log.status === 'present' ? 'bg-emerald-100 text-emerald-600' : log.status === 'absent' ? 'bg-rose-100 text-rose-600' : log.status === 'rescheduled' ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-500'}`}>
+                                                            {log.status === 'present' ? <Icons.Check /> : log.status === 'absent' ? <Icons.X /> : log.status === 'rescheduled' ? <Icons.Reschedule /> : <Icons.Ban />}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <p className="text-sm font-bold text-slate-700 truncate">{new Date(log.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</p>
-                                                            <p className="text-[8px] font-black text-slate-400 uppercase">{log.status}</p>
+                                                            <p className="text-sm font-bold text-slate-700">{new Date(log.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</p>
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{log.status}</p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex gap-1">
+                                                    <div className="flex gap-2">
                                                         <button onClick={() => {
-                                                            const statusOrder = ['present', 'absent', 'canceled'];
+                                                            const statusOrder = ['present', 'absent', 'rescheduled', 'canceled'];
                                                             const nextStatus = statusOrder[(statusOrder.indexOf(log.status) + 1) % statusOrder.length];
-                                                            const nSubs = subjects.map(s => s.id === sub.id ? {...s, logs: s.logs.map(l => l.id === log.id ? {...l, status: nextStatus} : l)} : s);
-                                                            setSubjects(nSubs);
-                                                        }} className="p-2 text-slate-300 hover:text-indigo-500 shrink-0">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-                                                        </button>
-                                                        <button onClick={() => {
-                                                            const nSubs = subjects.map(s => s.id === sub.id ? {...s, logs: s.logs.filter(l => l.id !== log.id)} : s);
-                                                            setSubjects(nSubs);
-                                                        }} className="p-2 text-slate-300 hover:text-rose-500 shrink-0"><Icons.Trash size={16} /></button>
+                                                            setSubjects(subjects.map(s => s.id === sub.id ? {...s, logs: s.logs.map(l => l.id === log.id ? {...l, status: nextStatus} : l)} : s));
+                                                        }} className="p-3 text-slate-300 hover:text-indigo-500"><Icons.Reschedule size={16}/></button>
+                                                        <button onClick={() => setSubjects(subjects.map(s => s.id === sub.id ? {...s, logs: s.logs.filter(l => l.id !== log.id)} : s))} className="p-3 text-slate-300 hover:text-rose-500"><Icons.Trash size={16}/></button>
                                                     </div>
                                                 </div>
                                             ))}
-                                            {sub.logs.length === 0 && <p className="text-center py-12 text-slate-400 font-bold italic text-sm px-4">No records yet.</p>}
+                                            {sub.logs.length === 0 && <p className="text-center py-20 text-slate-300 font-bold italic text-sm">No records found.</p>}
                                         </div>
                                     </div>
                                 );
@@ -472,7 +482,7 @@
                     )}
 
                     {}
-                    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[400px] bg-slate-900/95 backdrop-blur-2xl h-18 rounded-[2.5rem] shadow-2xl flex items-center justify-around px-4 border border-white/10 z-40">
+                    <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] bg-slate-900/95 backdrop-blur-3xl h-20 rounded-[3rem] shadow-2xl flex items-center justify-around px-6 border border-white/10 z-[60]">
                         <button onClick={() => setActiveTab('dashboard')} className={`p-4 rounded-2xl transition-all ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
                             <Icons.Dashboard />
                         </button>
@@ -482,87 +492,96 @@
                         <button onClick={() => setActiveTab('timetable')} className={`p-4 rounded-2xl transition-all ${activeTab === 'timetable' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
                             <Icons.Calendar />
                         </button>
-                        <div className="w-[1.5px] h-8 bg-white/10 mx-1" />
-                        <div className="p-1 cursor-pointer opacity-80 hover:opacity-100 transition-all text-white shrink-0" onClick={() => setActiveTab('dashboard')}>
-                            <Icons.Logo size={28} />
+                        <div className="w-[1.5px] h-8 bg-white/10 mx-2" />
+                        <div className="p-2 cursor-pointer opacity-80 hover:opacity-100 transition-all text-white shrink-0" onClick={() => setActiveTab('dashboard')}>
+                            <Icons.Logo size={32} />
                         </div>
                     </nav>
 
                     {}
                     {modal.isOpen && (
-                        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 modal-overlay">
-                            <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
-                                {modal.type === 'LOGOUT_CHECK' && (
-                                    <div className="p-8 text-center space-y-6">
-                                        <div className="mx-auto w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400">
-                                            <Icons.LogOut size={32} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <h4 className="text-xl font-black text-slate-900">Logout Profile?</h4>
-                                            <p className="text-xs font-bold text-slate-400">This will erase your current session data from this device.</p>
-                                        </div>
-                                        <div className="flex gap-3">
-                                            <button onClick={closeSubModal} className="flex-1 h-12 bg-slate-100 rounded-xl font-black text-slate-500 text-sm">Cancel</button>
-                                            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="flex-1 h-12 bg-rose-500 rounded-xl font-black text-white text-sm">Logout</button>
+                        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-6 modal-overlay overflow-y-auto">
+                            <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 my-auto">
+                                {modal.type === 'SETTINGS' && (
+                                    <div className="p-10 text-center space-y-6">
+                                        <div className="mx-auto w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400"><Icons.Dashboard /></div>
+                                        <h4 className="text-xl font-black">Preferences</h4>
+                                        <div className="space-y-4">
+                                            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full h-14 bg-rose-500 rounded-2xl font-black text-white text-sm">Logout & Reset</button>
+                                            <button onClick={closeUIModal} className="w-full h-14 bg-slate-100 rounded-2xl font-black text-slate-500 text-sm">Cancel</button>
                                         </div>
                                     </div>
                                 )}
 
                                 {modal.type === 'DELETE_SUBJECT' && (
-                                    <div className="p-8 text-center space-y-6">
-                                        <div className="mx-auto w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500">
-                                            <Icons.Trash size={32} />
+                                    <div className="p-10 text-center space-y-8">
+                                        <div className="mx-auto w-20 h-20 bg-rose-50 rounded-[2rem] flex items-center justify-center text-rose-500"><Icons.Trash /></div>
+                                        <div>
+                                            <h4 className="text-2xl font-black text-slate-900 mb-2">Delete Course?</h4>
+                                            <p className="text-xs font-bold text-slate-400">"{modal.data.name}" records will be wiped.</p>
                                         </div>
-                                        <div className="space-y-2">
-                                            <h4 className="text-xl font-black text-slate-900">Erase Course?</h4>
-                                            <p className="text-xs font-bold text-slate-400">"{modal.data.name}" and all its history will be deleted.</p>
-                                        </div>
-                                        <div className="flex gap-3">
-                                            <button onClick={closeSubModal} className="flex-1 h-12 bg-slate-100 rounded-xl font-black text-slate-500 text-sm">Cancel</button>
-                                            <button onClick={() => { setSubjects(subjects.filter(x => x.id !== modal.data.id)); closeSubModal(); }} className="flex-1 h-12 bg-rose-500 rounded-xl font-black text-white text-sm">Delete</button>
+                                        <div className="flex gap-4">
+                                            <button onClick={closeUIModal} className="flex-1 h-14 bg-slate-100 rounded-2xl font-black text-slate-500 text-sm">No</button>
+                                            <button onClick={() => { setSubjects(subjects.filter(x => x.id !== modal.data.id)); closeUIModal(); }} className="flex-1 h-14 bg-rose-500 rounded-2xl font-black text-white text-sm">Yes</button>
                                         </div>
                                     </div>
                                 )}
 
+                                {modal.type === 'EDIT_SUBJECT' && (
+                                    <div className="p-10 space-y-6">
+                                        <h4 className="text-xl font-black">Edit {modal.data.name}</h4>
+                                        <form onSubmit={(e) => {
+                                            e.preventDefault();
+                                            setSubjects(subjects.map(s => s.id === modal.data.id ? { ...s, target: parseInt(e.target.target.value), totalExpected: parseInt(e.target.cap.value) } : s));
+                                            closeUIModal();
+                                        }} className="space-y-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Update Goal %</label>
+                                                <input name="target" type="number" defaultValue={modal.data.target} className="w-full h-14 bg-slate-50 rounded-2xl px-5 font-bold outline-none border border-slate-100" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Update Cap</label>
+                                                <input name="cap" type="number" defaultValue={modal.data.totalExpected} className="w-full h-14 bg-slate-50 rounded-2xl px-5 font-bold outline-none border border-slate-100" />
+                                            </div>
+                                            <button type="submit" className="w-full h-14 bg-indigo-600 rounded-2xl font-black text-white text-sm">Save Changes</button>
+                                            <button type="button" onClick={closeUIModal} className="w-full h-14 bg-slate-100 rounded-2xl font-black text-slate-500 text-sm">Cancel</button>
+                                        </form>
+                                    </div>
+                                )}
+
                                 {modal.type === 'EXTRA_CLASS_CHECK' && (
-                                    <div className="p-8 text-center space-y-6">
-                                        <div className="mx-auto w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500">
-                                            <Icons.Alert size={32} />
+                                    <div className="p-10 text-center space-y-8">
+                                        <div className="mx-auto w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500"><Icons.Plus /></div>
+                                        <div>
+                                            <h4 className="text-2xl font-black text-slate-900 mb-2">Extra Class?</h4>
+                                            <p className="text-xs font-bold text-slate-400">Log an additional session for "{modal.data.subName}"?</p>
                                         </div>
-                                        <div className="space-y-2">
-                                            <h4 className="text-xl font-black text-slate-900">Extra Class?</h4>
-                                            <p className="text-xs font-bold text-slate-400">You already logged "{modal.data.subName}" today. How should we handle this?</p>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, true)} className="w-full h-12 bg-indigo-600 rounded-xl font-black text-white text-sm">Rescheduled (Uses Slot)</button>
-                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, false)} className="w-full h-12 bg-slate-900 rounded-xl font-black text-white text-sm">Bonus (No Slot Used)</button>
-                                            <button onClick={closeSubModal} className="w-full h-12 bg-slate-100 rounded-xl font-black text-slate-500 text-sm">Cancel</button>
+                                        <div className="space-y-4">
+                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, true)} className="w-full h-14 bg-indigo-600 rounded-2xl font-black text-white text-sm shadow-lg">Moved Slot (Uses Cap)</button>
+                                            <button onClick={() => logAttendance(modal.data.id, modal.data.status, true, false)} className="w-full h-14 bg-slate-900 rounded-2xl font-black text-white text-sm">Bonus (Add to Cap)</button>
+                                            <button onClick={closeUIModal} className="w-full h-14 bg-slate-100 rounded-2xl font-black text-slate-500 text-sm">Cancel</button>
                                         </div>
                                     </div>
                                 )}
 
                                 {modal.type === 'ADD_TO_TIMETABLE' && (
                                     <div className="p-8 space-y-6">
-                                        <div className="space-y-1">
-                                            <h4 className="text-xl font-black text-slate-900 tracking-tight">Add to {modal.data}</h4>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select a subject for this slot</p>
-                                        </div>
-                                        <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                                        <h4 className="text-2xl font-black text-slate-900">Add to {modal.data}</h4>
+                                        <div className="space-y-2 max-h-72 overflow-y-auto no-scrollbar pb-2">
                                             {subjects.length === 0 ? (
-                                                <p className="text-center py-4 text-xs font-bold text-slate-300 italic">No subjects available.</p>
+                                                <p className="text-center py-6 text-xs font-bold text-slate-300 italic">No courses found.</p>
                                             ) : subjects.map(s => (
                                                 <button key={s.id} onClick={() => {
                                                     const newTT = {...timetable};
                                                     newTT[modal.data] = [...(newTT[modal.data] || []), s.id];
                                                     setTimetable(newTT);
-                                                    closeSubModal();
-                                                }} className="w-full p-4 bg-slate-50 rounded-xl text-left font-bold text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-transparent hover:border-indigo-100 transition-all flex justify-between items-center">
-                                                    {s.name}
-                                                    <Icons.Check size={14} className="opacity-0 group-hover:opacity-100" />
+                                                    closeUIModal();
+                                                }} className="w-full p-4 bg-slate-50 rounded-2xl text-left font-bold text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-transparent hover:border-indigo-100 flex justify-between items-center shrink-0">
+                                                    {s.name} <Icons.Plus />
                                                 </button>
                                             ))}
                                         </div>
-                                        <button onClick={closeSubModal} className="w-full h-12 bg-slate-900 rounded-xl font-black text-white text-sm mt-2">Close</button>
+                                        <button onClick={closeUIModal} className="w-full h-14 bg-slate-900 rounded-2xl font-black text-white text-sm">Cancel</button>
                                     </div>
                                 )}
                             </div>
